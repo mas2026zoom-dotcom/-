@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'patch/overlay.zip'
+      - 'patch/overlay.b64'
 permissions:
   contents: write
 jobs:
@@ -13,8 +13,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Apply overlay
         run: |
-          if [ -f patch/overlay.zip ]; then
-            unzip -o patch/overlay.zip -d .
+          if [ -f patch/overlay.b64 ]; then
+            base64 -d patch/overlay.b64 > /tmp/overlay.zip
+            unzip -o /tmp/overlay.zip -d .
             if [ -f patch/delete.txt ]; then xargs -r rm -f < patch/delete.txt; fi
             rm -rf patch
             git config user.name "github-actions"
