@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Takes screenshots of the debug build on the emulator (CI only).
 mkdir -p shots
+exec > >(tee shots/log.txt) 2>&1
+set -x
+ls -la apk || true
 PKG=com.mas.alsalah
 adb wait-for-device
 adb shell input keyevent KEYCODE_WAKEUP
