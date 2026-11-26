@@ -12,7 +12,7 @@ private val Context.appDataStore by preferencesDataStore(name = "al_salah_settin
 enum class AlertSound { TAKBEER, TONE, SILENT }
 data class PrayerAlertSettings(
     val enabled: Boolean = true,
-    val preAlertMinutes: Int = 0,
+    val preAlertMinutes: Int = 10,
     val atPrayerTime: Boolean = true,
     val sound: AlertSound = AlertSound.TAKBEER,
     val vibration: Boolean = true,
@@ -76,7 +76,7 @@ class SettingsRepository(private val context: Context) {
         val alerts = prayerNames.associateWith { name ->
             PrayerAlertSettings(
                 enabled = p[alertBoolKey(name, "enabled")] ?: true,
-                preAlertMinutes = p[alertIntKey(name, "pre")] ?: 0,
+                preAlertMinutes = p[alertIntKey(name, "pre")] ?: 10,
                 atPrayerTime = p[alertBoolKey(name, "at")] ?: true,
                 sound = runCatching { AlertSound.valueOf(p[alertKey(name, "sound")] ?: "TAKBEER") }.getOrDefault(AlertSound.TAKBEER),
                 vibration = p[alertBoolKey(name, "vibration")] ?: true,

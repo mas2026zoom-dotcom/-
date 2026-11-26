@@ -21,6 +21,7 @@ import android.os.Bundle
 import android.graphics.BitmapFactory
 import com.mas.alsalah.R
 import android.speech.tts.TextToSpeech
+import android.util.Log
 import android.speech.tts.UtteranceProgressListener
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -345,11 +346,18 @@ class PrayerSpeechService : Service() {
                 return@TextToSpeech
             }
             engine.setAudioAttributes(attributes)
+            var spoken = phrase
             var language = engine.setLanguage(Locale("ar", "EG"))
             if (language == TextToSpeech.LANG_MISSING_DATA || language == TextToSpeech.LANG_NOT_SUPPORTED) {
                 language = engine.setLanguage(Locale("ar"))
             }
             if (language == TextToSpeech.LANG_MISSING_DATA || language == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Log.w("AlSalahVoice", "Arabic TTS unavailable, using fallback voice")
+                spoken = intent?.getStringExtra("speech_fallback") ?: "Prayer time is approaching"
+                language = engine.setLanguage(Locale.ENGLISH)
+            }
+            if (language == TextToSpeech.LANG_MISSING_DATA || language == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Log.e("AlSalahVoice", "No TTS voice available")
                 stopSelf(startId)
                 return@TextToSpeech
             }
@@ -359,14 +367,14 @@ class PrayerSpeechService : Service() {
                 private fun finish() {
                     Handler(Looper.getMainLooper()).post { stopSelf(startId) }
                 }
-                override fun onStart(utteranceId: String?) = Unit
-                override fun onDone(utteranceId: String?) = finish()
-                override fun onError(utteranceId: String?) = finish()
+                override fun onStart(utteranceId: String?) { Log.i("AlSalahVoice", "speaking") }
+                override fun onDone(utteranceId: String?) { Log.i("AlSalahVoice", "spoken done"); finish() }
+                override fun onError(utteranceId: String?) { Log.e("AlSalahVoice", "speech error"); finish() }
             })
             val params = Bundle().apply {
                 putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume)
             }
-            if (engine.speak(phrase, TextToSpeech.QUEUE_FLUSH, params, "al_salah_voice_$startId") == TextToSpeech.ERROR) {
+            if (engine.speak(spoken, TextToSpeech.QUEUE_FLUSH, params, "al_salah_voice_$startId") == TextToSpeech.ERROR) {
                 stopSelf(startId)
             }
         }
@@ -441,6 +449,7 @@ class PrayerAlarmReceiver : BroadcastReceiver() {
                     runCatching {
                         val speech = Intent(context, PrayerSpeechService::class.java)
                             .putExtra("speech_text", "اقتربت صلاة $prayer")
+                            .putExtra("speech_fallback", "Prayer time is approaching")
                             .putExtra("speech_volume", 100)
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(speech)
                         else context.startService(speech)

@@ -54,6 +54,10 @@ tap_text "التقويم الهجري"; sleep 2; shot 09-calendar
 adb shell input keyevent KEYCODE_BACK; sleep 1
 tap_text "الإعدادات"; sleep 2; shot 10-settings
 tap_text "تنبيهات الصلاة"; sleep 2; shot 11-settings-alerts
+adb logcat -c || true
+tap_text "تجربة التنبيه"; sleep 12
+adb logcat -d | grep -E "AlSalahVoice|PrayerSpeech|TextToSpeech" > shots/voice.log 2>&1 || true
+shot 11b-voice-test
 adb shell input keyevent KEYCODE_BACK; sleep 1
 adb shell input keyevent KEYCODE_BACK; sleep 1
 tap_text "حول التطبيق"; sleep 2; shot 12-about

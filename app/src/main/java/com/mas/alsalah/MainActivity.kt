@@ -1115,6 +1115,19 @@ private fun prayerIcon(name: String) = when (name) {
                     }
                 }
 
+                GlassCard(Modifier.fillMaxWidth()) {
+                    val ctx = androidx.compose.ui.platform.LocalContext.current
+                    Button(onClick = {
+                        runCatching {
+                            val i = android.content.Intent(ctx, com.mas.alsalah.notifications.PrayerSpeechService::class.java)
+                                .putExtra("speech_text", "اقتربت صلاة العصر")
+                                .putExtra("speech_fallback", "Prayer time is approaching")
+                                .putExtra("speech_volume", 100)
+                            ctx.startForegroundService(i)
+                        }
+                    }, modifier = Modifier.fillMaxWidth()) { Text("تجربة التنبيه الصوتي \"اقتربت الصلاة\"") }
+                }
+
                 prayers.forEach { prayer ->
                     val alert = settings.alertFor(prayer)
                     var custom by remember(prayer, alert.preAlertMinutes) {
