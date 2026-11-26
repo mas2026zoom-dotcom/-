@@ -2,6 +2,7 @@ package com.mas.alsalah.notifications
 
 import android.app.AlarmManager
 import android.media.AudioFocusRequest
+import android.media.MediaPlayer
 import android.media.AudioManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -292,6 +293,7 @@ class PrayerSpeechService : Service() {
     private var audioManager: AudioManager? = null
     private var focusRequest: AudioFocusRequest? = null
     private var started = false
+    private var clipPlayer: MediaPlayer? = null
 
     override fun onBind(intent: Intent?) = null
 
@@ -339,6 +341,33 @@ class PrayerSpeechService : Service() {
             audioManager?.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
         }
 
+        val clipName = when {
+            phrase.contains("الفجر") -> "voice_fajr"
+            phrase.contains("الظهر") -> "voice_dhuhr"
+            phrase.contains("العصر") -> "voice_asr"
+            phrase.contains("المغرب") -> "voice_maghrib"
+            phrase.contains("العشاء") -> "voice_isha"
+            else -> null
+        }
+        val clipRes = clipName?.let { resources.getIdentifier(it, "raw", packageName) } ?: 0
+        if (clipRes != 0) {
+            try {
+                val sessionId = audioManager?.generateAudioSessionId() ?: AudioManager.AUDIO_SESSION_ID_GENERATE
+                val mp = MediaPlayer.create(applicationContext, clipRes, attributes, sessionId)
+                if (mp != null) {
+                    clipPlayer = mp
+                    mp.setVolume(volume, volume)
+                    mp.setOnCompletionListener { Log.i("AlSalahVoice", "spoken done (clip)"); stopSelf(startId) }
+                    mp.setOnErrorListener { _, _, _ -> Log.e("AlSalahVoice", "clip error"); stopSelf(startId); true }
+                    mp.start()
+                    Log.i("AlSalahVoice", "speaking (clip $clipName)")
+                    return START_NOT_STICKY
+                }
+            } catch (e: Exception) {
+                Log.e("AlSalahVoice", "clip failed, using TTS", e)
+            }
+        }
+
         speechEngine = TextToSpeech(applicationContext) { status ->
             val engine = speechEngine
             if (status != TextToSpeech.SUCCESS || engine == null) {
@@ -382,6 +411,8 @@ class PrayerSpeechService : Service() {
     }
 
     override fun onDestroy() {
+        clipPlayer?.release()
+        clipPlayer = null
         speechEngine?.stop()
         speechEngine?.shutdown()
         speechEngine = null
