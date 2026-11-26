@@ -2,21 +2,11 @@ name: Build APK
 on:
   push:
   workflow_dispatch:
-permissions:
-  contents: write
 jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Unpack project
-        run: |
-          test -f alsalah-project.zip
-          mkdir -p /tmp/proj proj
-          unzip -q alsalah-project.zip -d /tmp/proj
-          cp -r /tmp/proj/*/. proj/
-          rm -rf proj/.github
-          ls -la proj
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -25,9 +15,8 @@ jobs:
         with:
           gradle-version: "8.9"
       - name: Build debug APK
-        working-directory: proj
         run: gradle --no-daemon assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: al-salah-debug-apk
-          path: proj/app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/*.apk
