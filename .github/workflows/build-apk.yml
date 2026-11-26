@@ -1,7 +1,9 @@
 name: Build APK
 on:
-  push:
   workflow_dispatch:
+  push:
+    paths:
+      - 'patch/overlay.zip'
 permissions:
   contents: write
 jobs:
@@ -9,6 +11,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Apply overlay
+        run: |
+          if [ -f patch/overlay.zip ]; then
+            unzip -o patch/overlay.zip -d .
+            if [ -f patch/delete.txt ]; then xargs -r rm -f < patch/delete.txt; fi
+            rm -rf patch
+            git config user.name "github-actions"
+            git config user.email "actions@users.noreply.github.com"
+            git add -A
+            git commit -m "Apply app redesign" || true
+            git push || true
+          fi
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -17,7 +31,20 @@ jobs:
         with:
           gradle-version: "8.9"
       - name: Build debug APK
-        run: gradle --no-daemon assembleDebug
+        run: |
+          set +e
+          gradle --no-daemon assembleDebug > build.log 2>&1
+          code=$?
+          tail -n 150 build.log
+          exit $code
+      - name: Publish build log
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          grep -E "^e: |error:|FAILED|What went wrong|BUILD" -A3 build.log | head -n 200 > build-errors.txt || true
+          gh release delete build-log --yes --cleanup-tag || true
+          gh release create build-log build.log build-errors.txt --title "Build log" --notes "log" --target "$GITHUB_SHA" || true
       - uses: actions/upload-artifact@v4
         with:
           name: al-salah-debug-apk
@@ -29,3 +56,34 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk al-salah-debug.apk
           gh release delete apk-latest --yes --cleanup-tag || true
           gh release create apk-latest al-salah-debug.apk --title "Al-Salah debug APK" --notes "Debug build" --target "$GITHUB_SHA"
+  screens:
+    needs: apk
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: al-salah-debug-apk
+          path: apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          script: bash ci/screens.sh
+      - name: Publish screenshots
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls shots || true
+          gh release delete screens-latest --yes --cleanup-tag || true
+          gh release create screens-latest shots/* --title "Screens" --notes "screens" --target "$GITHUB_SHA" || true
