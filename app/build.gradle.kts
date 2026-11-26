@@ -37,6 +37,14 @@ android {
             }
         }
     }
+    System.getenv("STABLE_DEBUG_KEYSTORE")?.takeIf { it.isNotBlank() }?.let { ks ->
+        signingConfigs.getByName("debug").apply {
+            storeFile = file(ks)
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
