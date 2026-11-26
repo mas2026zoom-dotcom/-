@@ -37,8 +37,10 @@ jobs:
         run: |
           test -n "$KS_B64" || { echo "DEBUG_KEYSTORE_B64 secret missing"; exit 1; }
           mkdir -p ~/.android
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/stable.keystore"
           echo "$KS_B64" | base64 -d > ~/.android/debug.keystore
-          keytool -list -keystore ~/.android/debug.keystore -storepass android | tail -2
+          echo "STABLE_DEBUG_KEYSTORE=$RUNNER_TEMP/stable.keystore" >> "$GITHUB_ENV"
+          keytool -list -keystore "$RUNNER_TEMP/stable.keystore" -storepass android | tail -2
       - name: Build debug APK
         run: |
           set +e
