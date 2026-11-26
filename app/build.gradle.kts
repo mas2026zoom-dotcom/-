@@ -21,8 +21,8 @@ android {
         applicationId = "com.mas.alsalah"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "2.0.0"
+        versionCode = 11
+        versionName = "3.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -132,6 +132,7 @@ val generateAlSalahLauncherIcons by tasks.registering {
         // Adaptive launchers apply a circular/squircle mask; keep the artwork
         // inside the central safe zone to prevent any edge clipping.
         ImageIO.write(renderContained(432, 0.68), "png", File(adaptiveDir, "ic_launcher_art.png"))
+        ImageIO.write(renderContained(512, 1.0), "png", File(adaptiveDir, "logo_full.png"))
     }
 }
 // Restore the verified bundled Adhan recording used by the prayer-time playback service.

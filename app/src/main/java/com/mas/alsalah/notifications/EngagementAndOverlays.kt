@@ -1,20 +1,35 @@
 package com.mas.alsalah.notifications
 
 import android.content.Context
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mas.alsalah.GlassButton
+import com.mas.alsalah.GlassCard
+import com.mas.alsalah.GoldButton
+import com.mas.alsalah.IconBadge
 
-@androidx.compose.runtime.Composable
+@Composable
 fun DailyMotivationCard() {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val prefs = androidx.compose.runtime.remember { context.getSharedPreferences("weekly_motivation", Context.MODE_PRIVATE) }
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("weekly_motivation", Context.MODE_PRIVATE) }
     val today = java.time.LocalDate.now()
     val startEpoch = prefs.getLong("week_start", -1L).let { stored ->
         if (stored >= 0L) stored else today.toEpochDay().also { prefs.edit().putLong("week_start", it).apply() }
@@ -24,33 +39,37 @@ fun DailyMotivationCard() {
     val week = (elapsed / 7).toInt() + 1
     val day = (elapsed % 7).toInt()
     val key = "week_${week}_day_${day}"
-    var done by androidx.compose.runtime.remember(key) { androidx.compose.runtime.mutableStateOf(prefs.getBoolean(key, false)) }
+    var done by remember(key) { mutableStateOf(prefs.getBoolean(key, false)) }
     val prompts = listOf(
         "ابدأ يومك بركعتين وذكر الله", "اقرأ صفحة من القرآن بتدبر", "حافظ على أذكار الصباح والمساء",
         "صلّ على النبي ﷺ مئة مرة", "تصدّق ولو بالقليل", "صلّ رحمك أو اسأل عن شخص تحبه", "راجع ما أنجزته واشكر الله"
     )
-    androidx.compose.material3.Surface(
-        modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
-        color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
-    ) {
-        androidx.compose.foundation.layout.Column(
-            modifier = androidx.compose.ui.Modifier.padding(15.dp),
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
-            horizontalAlignment = androidx.compose.ui.Alignment.End
-        ) {
-            androidx.compose.material3.Text("تحدي الأسبوع $week • اليوم ${day + 1} من ٧",
-                color = androidx.compose.material3.MaterialTheme.colorScheme.primary, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-            androidx.compose.material3.Text(prompts[day], color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-                textAlign = androidx.compose.ui.text.style.TextAlign.End)
-            androidx.compose.material3.Text("إنجاز الأسبوع: " + (0..6).count { prefs.getBoolean("week_${week}_day_${it}", false) } + " / ٧",
-                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-            androidx.compose.material3.Button(onClick = {
-                done = !done
-                prefs.edit().putBoolean(key, done).apply()
-            }, modifier = androidx.compose.ui.Modifier.fillMaxWidth()) {
-                androidx.compose.material3.Text(if (done) "تم إنجاز مهمة اليوم ✓" else "سجّل إنجاز اليوم")
+    GlassCard(Modifier.fillMaxWidth(), emphasis = true) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "إنجاز الأسبوع: " + (0..6).count { prefs.getBoolean("week_${week}_day_${it}", false) } + " / ٧",
+                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("تحدي الأسبوع $week", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                    Text("اليوم ${day + 1} من ٧", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                }
+                IconBadge(Icons.Outlined.EmojiEvents, size = 44.dp)
             }
+        }
+        Text(prompts[day], color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+        if (done) {
+            GlassButton("تم إنجاز مهمة اليوم ✓", {
+                done = false
+                prefs.edit().putBoolean(key, false).apply()
+            }, Modifier.fillMaxWidth())
+        } else {
+            GoldButton("سجّل إنجاز اليوم", {
+                done = true
+                prefs.edit().putBoolean(key, true).apply()
+            }, Modifier.fillMaxWidth(), height = 48.dp)
         }
     }
 }

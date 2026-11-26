@@ -25,6 +25,11 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -121,14 +126,14 @@ class MainActivity : ComponentActivity() {
             "LIGHT" -> false
             else -> (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
         }
-        val initialBarColor = if (initialDark) android.graphics.Color.rgb(16, 27, 28) else android.graphics.Color.rgb(243, 247, 245)
+        val initialBarColor = if (initialDark) android.graphics.Color.rgb(3, 20, 14) else android.graphics.Color.rgb(237, 245, 240)
         window.statusBarColor = initialBarColor
         window.navigationBarColor = initialBarColor
         window.setBackgroundDrawable(ColorDrawable(initialBarColor))
         window.decorView.systemUiVisibility = if (initialDark) 0 else
             android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         PrayerNotificationScheduler.createChannel(this)
-        setContent { App(initialThemeMode) }
+        setContent { CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) { App(initialThemeMode) } }
     }
 
     override fun onResume() {
@@ -296,18 +301,20 @@ private val duas = listOf(
     }
     val appColors = if (isDark) {
         darkColorScheme(
-            primary = Color(0xFF9ADCC5), onPrimary = Color(0xFF09271E),
-            background = Color(0xFF081A15), surface = Color(0xEE142A22),
-            onSurface = Color(0xFFF3F8F4), surfaceVariant = Color(0xFF20392F),
-            onSurfaceVariant = Color(0xFFB3C8BC), outline = Color(0x35FFFFFF),
-            secondary = Color(0xFFE1C27A), onSecondary = Color(0xFF2A2110)
+            primary = Color(0xFFF2CB6B), onPrimary = Color(0xFF2A1D03),
+            background = Color(0xFF04140E), surface = Color(0xFF0C2218),
+            onSurface = Color(0xFFF6F2E4), surfaceVariant = Color(0xFF16352A),
+            onSurfaceVariant = Color(0xFFABC5B7), outline = Color(0x33FFFFFF),
+            secondary = Color(0xFF6FE0B0), onSecondary = Color(0xFF04140E),
+            secondaryContainer = Color(0xFF1B5E45), onSecondaryContainer = Color(0xFFFFE9A8)
         )
     } else {
         lightColorScheme(
-            primary = Color(0xFF176B52), onPrimary = Color.White, background = Color(0xFFF3F7F3),
-            surface = Color(0xF8FFFFFF), onSurface = Color(0xFF17271F),
-            surfaceVariant = Color(0xFFE7F0E9), onSurfaceVariant = Color(0xFF65766B),
-            outline = Color(0xFFDCE7DE), secondary = Color(0xFFB18A3B), onSecondary = Color.White
+            primary = Color(0xFF0B6B4A), onPrimary = Color.White, background = Color(0xFFEDF5F0),
+            surface = Color(0xFFFFFFFF), onSurface = Color(0xFF0E2A1F),
+            surfaceVariant = Color(0xFFDCEBE1), onSurfaceVariant = Color(0xFF4F6B5E),
+            outline = Color(0x330B6B4A), secondary = Color(0xFFA67C1F), onSecondary = Color.White,
+            secondaryContainer = Color(0xFFCFE9DA), onSecondaryContainer = Color(0xFF0B3D2B)
         )
     }
     MaterialTheme(
@@ -322,19 +329,14 @@ private val duas = listOf(
     ) {
         SideEffect {
             (context as? MainActivity)?.window?.let { window ->
-                val bar = if (isDark) android.graphics.Color.rgb(16, 27, 28) else android.graphics.Color.rgb(243, 247, 245)
+                val bar = if (isDark) android.graphics.Color.rgb(3, 20, 14) else android.graphics.Color.rgb(237, 245, 240)
                 window.statusBarColor = bar
                 window.navigationBarColor = bar
                 window.decorView.systemUiVisibility = if (isDark) 0 else
                     android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
             }
         }
-        Box(Modifier.fillMaxSize().background(
-            Brush.verticalGradient(
-                if (isDark) listOf(Color(0xFF0A2119), Color(0xFF102B20), Color(0xFF071710))
-                else listOf(Color(0xFFF8FBF8), Color(0xFFEDF4EE), Color(0xFFE6EFE8))
-            )
-        )) {
+        AuroraBackground {
             Column(Modifier.fillMaxSize()) {
                 Box(Modifier.weight(1f)) {
                     val activePage = page
@@ -379,61 +381,21 @@ private val duas = listOf(
                 }
                 if (page.isEmpty()) BottomBar(tab, selectTab)
             }
-        }
-    }
-}
-@Composable private fun Page(content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-            .padding(horizontal = 22.dp, vertical = 20.dp),
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(11.dp),
-        content = content
-    )
-}
-@Composable private fun Header(title: String, subtitle: String? = null, back: (() -> Unit)? = null) {
-    Row(
-        Modifier.fillMaxWidth().padding(bottom = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (back != null) {
-            Surface(
-                onClick = back,
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-            ) {
-                Icon(Icons.Outlined.ArrowBack, "رجوع", tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(11.dp).size(19.dp))
-            }
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Column(horizontalAlignment = Alignment.Start) {
-                    Text("MAS", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold, letterSpacing = 1.8.sp)
-                    Text("AL-SALAH", color = MaterialTheme.colorScheme.onSurface, fontSize = 10.sp,
-                        fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+            var splash by remember { mutableStateOf(true) }
+            LaunchedEffect(Unit) { delay(900); splash = false }
+            val splashAlpha by animateFloatAsState(if (splash) 1f else 0f, tween(450), label = "splash")
+            if (splashAlpha > 0.01f) {
+                Box(Modifier.fillMaxSize().graphicsLayer { alpha = splashAlpha }.background(if (isDark) Lux.Night else Color(0xFFEDF5F0)),
+                    contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Image(painterResource(R.drawable.logo_full), contentDescription = null,
+                            modifier = Modifier.size(150.dp).clip(RoundedCornerShape(38.dp)), contentScale = ContentScale.Fit)
+                        Text("الصلاة", color = MaterialTheme.colorScheme.primary, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("AL-SALAH", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, letterSpacing = 4.sp)
+                    }
                 }
-                Image(painterResource(R.drawable.ic_launcher_art), contentDescription = "شعار الصلاة",
-                    modifier = Modifier.size(42.dp), contentScale = ContentScale.Fit)
             }
         }
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, color = MaterialTheme.colorScheme.onSurface, fontSize = 23.sp, fontWeight = FontWeight.Bold)
-            if (subtitle != null) Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-        }
-    }
-}
-@Composable private fun GlassCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier,
-        shape = RoundedCornerShape(23.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = if (MaterialTheme.colorScheme.background == DarkCanvas) 0.72f else 0.76f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = if (MaterialTheme.colorScheme.background == DarkCanvas) 0.16f else 0.88f)),
-        shadowElevation = 9.dp
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
     }
 }
 
@@ -459,7 +421,7 @@ private fun storeSavedSet(context: Context, key: String, values: Set<String>) {
         .edit().putStringSet(key, values.toSet()).apply()
 }
 
-@Composable private fun PrayerCountdown(nextPrayerAt: ZonedDateTime, use24Hour: Boolean, inverse: Boolean = false) {
+@Composable private fun HeroCountdown(nextPrayerAt: ZonedDateTime, startAt: ZonedDateTime?, use24Hour: Boolean) {
     var now by remember(nextPrayerAt) { mutableStateOf(ZonedDateTime.now(nextPrayerAt.zone)) }
     LaunchedEffect(nextPrayerAt) {
         while (true) {
@@ -468,17 +430,25 @@ private fun storeSavedSet(context: Context, key: String, values: Set<String>) {
         }
     }
     val remaining = Duration.between(now, nextPrayerAt).seconds.coerceAtLeast(0)
-    Text("%02d:%02d:%02d".format(remaining / 3600, (remaining % 3600) / 60, remaining % 60),
-        color = if (inverse) Color.White else MaterialTheme.colorScheme.primary, fontSize = 37.sp, fontWeight = FontWeight.Bold,
-        modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-    Text("متبقي على الأذان", color = if (inverse) Color.White.copy(alpha = 0.78f) else MaterialTheme.colorScheme.onSurfaceVariant,
-        fontSize = 11.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-    HorizontalDivider(Modifier.padding(vertical = 13.dp), color = MaterialTheme.colorScheme.outline)
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(time(nextPrayerAt.toLocalTime(), use24Hour), color = if (inverse) Color.White else MaterialTheme.colorScheme.primary,
-            fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        Text("موعد الصلاة", color = if (inverse) Color.White.copy(alpha = 0.78f) else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+    val total = if (startAt == null) 0L else Duration.between(startAt, nextPrayerAt).seconds
+    val progress = if (total <= 0L) 0f else (1f - remaining.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+    Box(Modifier.size(150.dp), contentAlignment = Alignment.Center) {
+        ProgressRing(progress, Modifier.fillMaxSize(), stroke = 7.dp)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("%02d:%02d:%02d".format(remaining / 3600, (remaining % 3600) / 60, remaining % 60),
+                color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+            Text("متبقي على الأذان", color = Color.White.copy(alpha = 0.72f), fontSize = 10.sp)
+        }
     }
+}
+
+private fun prayerIcon(name: String) = when (name) {
+    "الفجر" -> Icons.Outlined.NightsStay
+    "الشروق" -> Icons.Outlined.WbTwilight
+    "الظهر" -> Icons.Outlined.WbSunny
+    "العصر" -> Icons.Outlined.WbCloudy
+    "المغرب" -> Icons.Outlined.WbTwilight
+    else -> Icons.Outlined.DarkMode
 }
 
 @Composable private fun HomePage(
@@ -505,124 +475,121 @@ private fun storeSavedSet(context: Context, key: String, values: Set<String>) {
             }
         }
     }
-    Page {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start,
-            verticalAlignment = Alignment.CenterVertically) {
-            Image(painterResource(R.drawable.ic_launcher_art), contentDescription = "شعار الصلاة",
-                modifier = Modifier.size(52.dp), contentScale = ContentScale.Fit)
-            Spacer(Modifier.width(10.dp))
-            Column(horizontalAlignment = Alignment.Start, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("AL-SALAH", color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.1.sp)
-                Text("صلاتك في وقتها", color = MaterialTheme.colorScheme.secondary,
-                    fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-            }
+    val prevAt: ZonedDateTime? = nextPrayer?.let { np ->
+        val d = np.second.toLocalDate()
+        val idx = prayerRows.indexOfFirst { it.first == np.first }
+        when {
+            d != now.toLocalDate() -> prayerRows.lastOrNull()?.let { now.toLocalDate().atTime(it.second).atZone(zone) }
+            idx > 0 -> d.atTime(prayerRows[idx - 1].second).atZone(zone)
+            else -> prayerRows.lastOrNull()?.let { d.minusDays(1).atTime(it.second).atZone(zone) }
         }
+    }
+    Page {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Surface(onClick = locate, shape = RoundedCornerShape(11.dp), color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
-                Row(Modifier.padding(horizontal = 11.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(Icons.Outlined.MyLocation, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                    Text("موقعي", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Image(painterResource(R.drawable.logo_full), contentDescription = "شعار الصلاة",
+                    modifier = Modifier.size(50.dp).clip(RoundedCornerShape(15.dp)), contentScale = ContentScale.Fit)
+                Column(horizontalAlignment = Alignment.Start, verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text("AL-SALAH", color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold, letterSpacing = 1.6.sp)
+                    Text("صلاتك في وقتها", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("أهلاً بك", color = MaterialTheme.colorScheme.secondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Text("صلاتك أولويتك", color = MaterialTheme.colorScheme.onSurface, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                Text(city.ifBlank { "حدد موقعك لعرض المواقيت" }, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            Row(Modifier.glass(RoundedCornerShape(50)).clickable(onClick = locate).padding(horizontal = 13.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(city.ifBlank { "حدد موقعك" }, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+                Icon(Icons.Outlined.MyLocation, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
             }
         }
         Text(now.format(DateTimeFormatter.ofPattern("EEEE، d MMMM yyyy", Locale("ar"))),
             color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp,
-            modifier = Modifier.align(Alignment.End).padding(top = 2.dp))
+            modifier = Modifier.align(Alignment.End))
         Box(
             Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(30.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF174F3D), Color(0xFF28745A), Color(0xFF123B2F))))
-                .border(1.dp, Color.White.copy(alpha = 0.52f), RoundedCornerShape(30.dp))
+                .clip(RoundedCornerShape(32.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF117A55), Color(0xFF0A4A35), Color(0xFF052A1E))))
+                .border(1.dp, Brush.linearGradient(listOf(Lux.Gold.copy(alpha = 0.9f), Lux.Gold.copy(alpha = 0.10f), Lux.Gold.copy(alpha = 0.55f))), RoundedCornerShape(32.dp))
         ) {
             Box(
-                Modifier.align(Alignment.TopStart).offset(x = (-42).dp, y = (-52).dp)
-                    .size(176.dp).background(Color.White.copy(alpha = 0.08f), CircleShape)
+                Modifier.align(Alignment.TopEnd).offset(x = 60.dp, y = (-60).dp).size(210.dp)
+                    .background(Brush.radialGradient(listOf(Lux.Gold.copy(alpha = 0.34f), Color.Transparent)), CircleShape)
             )
-            Box(
-                Modifier.align(Alignment.BottomEnd).offset(x = 44.dp, y = 54.dp)
-                    .size(154.dp).background(Color(0xFFB8D8FF).copy(alpha = 0.10f), CircleShape)
-            )
-            Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 22.dp),
-                horizontalAlignment = Alignment.End) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.16f)) {
-                        Icon(Icons.Outlined.Mosque, null, tint = Color.White,
-                            modifier = Modifier.padding(13.dp).size(26.dp))
-                    }
-                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text("الصلاة القادمة", color = Color.White.copy(alpha = 0.78f), fontSize = 12.sp)
-                        Text(nextPrayer?.first ?: "مواقيت الصلاة", color = Color.White,
-                            fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
-                    }
-                }
-                Spacer(Modifier.height(17.dp))
+            Image(painterResource(R.drawable.logo_full), contentDescription = null,
+                modifier = Modifier.align(Alignment.BottomStart).offset(x = (-34).dp, y = 38.dp).size(150.dp)
+                    .graphicsLayer { alpha = 0.10f },
+                contentScale = ContentScale.Fit)
+            Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.End) {
                 if (nextPrayer != null) {
-                    PrayerCountdown(nextPrayer.second, use24Hour, inverse = true)
-                } else {
-                    Text("حدد موقعك لحساب مواقيت الصلاة بدقة", color = Color.White,
-                        fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
-                    Button(onClick = locate, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 9.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF174F3D))) {
-                        Text("تحديد الموقع")
-                    }
-                }
-            }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("عرض الكل", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.clickable(onClick = openPrayer).padding(4.dp))
-            Text("مواقيت اليوم", color = MaterialTheme.colorScheme.onSurface, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        }
-        if (prayers == null) {
-            GlassCard(Modifier.fillMaxWidth()) {
-                Text("فعّل الموقع لعرض مواقيت الصلاة المحسوبة لمكانك.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = locate, modifier = Modifier.fillMaxWidth()) { Text("تحديد الموقع الآن") }
-            }
-        } else {
-            GlassCard(Modifier.fillMaxWidth()) {
-                rows(prayers).filter { showSunrise || it.first != "الشروق" }.forEachIndexed { index, row ->
-                    val isNext = row.first == nextPrayer?.first
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                        .background(if (isNext) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(time(row.second, use24Hour),
-                            color = if (isNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                            fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                            if (isNext) Text("القادمة", color = MaterialTheme.colorScheme.secondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            Text(row.first, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp,
-                                fontWeight = if (isNext) FontWeight.Bold else FontWeight.Medium)
-                            Icon(if (isNext) Icons.Outlined.NotificationsActive else Icons.Outlined.AccessTime, null,
-                                tint = if (isNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        HeroCountdown(nextPrayer.second, prevAt, use24Hour)
+                        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("الصلاة القادمة", color = Color.White.copy(alpha = 0.74f), fontSize = 12.sp)
+                            Text(nextPrayer.first, color = Lux.GoldSoft, fontSize = 36.sp, fontWeight = FontWeight.ExtraBold)
+                            Row(Modifier.clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.14f))
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(time(nextPrayer.second.toLocalTime(), use24Hour), color = Color.White,
+                                    fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Outlined.AccessTime, null, tint = Lux.Gold, modifier = Modifier.size(15.dp))
+                            }
                         }
                     }
-                    if (index != rows(prayers).filter { showSunrise || it.first != "الشروق" }.lastIndex)
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                } else {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("مواقيت الصلاة", color = Lux.GoldSoft, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("حدد موقعك لحساب المواقيت بدقة", color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    GoldButton("تحديد الموقع", locate, Modifier.fillMaxWidth(), Icons.Outlined.MyLocation)
                 }
             }
         }
-        Text("اختصاراتك", color = MaterialTheme.colorScheme.onSurface, fontSize = 18.sp,
-            fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.End))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionTitle("مواقيت اليوم", "عرض الكل", openPrayer)
+        if (prayers == null) {
+            GlassCard(Modifier.fillMaxWidth()) {
+                Text("فعّل الموقع لعرض مواقيت الصلاة المحسوبة لمكانك.", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End)
+                GoldButton("تحديد الموقع الآن", locate, Modifier.fillMaxWidth())
+            }
+        } else {
+            val shown = rows(prayers).filter { showSunrise || it.first != "الشروق" }
+            val nowTime = now.toLocalTime()
+            shown.forEach { row ->
+                val isNext = row.first == nextPrayer?.first
+                val passed = !isNext && !row.second.isAfter(nowTime)
+                Row(
+                    Modifier.fillMaxWidth().glass(RoundedCornerShape(22.dp), isNext)
+                        .padding(horizontal = 16.dp, vertical = 12.dp).graphicsLayer { alpha = if (passed) 0.55f else 1f },
+                    horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(time(row.second, use24Hour),
+                        color = if (isNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (isNext) Text("القادمة", color = Lux.OnGold, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clip(RoundedCornerShape(50)).background(Lux.goldBrush).padding(horizontal = 9.dp, vertical = 3.dp))
+                        Text(row.first, color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp,
+                            fontWeight = if (isNext) FontWeight.ExtraBold else FontWeight.SemiBold)
+                        IconBadge(prayerIcon(row.first), size = 38.dp)
+                    }
+                }
+            }
+        }
+        SectionTitle("اختصاراتك")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             QuickTile("الأذكار", "وردك اليومي", Icons.Outlined.AutoStories, Modifier.weight(1f), openDhikr)
-            QuickTile("مواقيت الصلاة", "تفاصيل اليوم", Icons.Outlined.AccessTime, Modifier.weight(1f), openPrayer)
+            QuickTile("مواقيت الصلاة", "جدول الشهر", Icons.Outlined.CalendarMonth, Modifier.weight(1f), openPrayer)
         }
         DailyMotivationCard()
-        Text("﴿ أَقِمِ الصَّلَاةَ لِذِكْرِي ﴾", color = MaterialTheme.colorScheme.secondary,
-            fontSize = 19.sp, fontWeight = FontWeight.SemiBold,
+        Text("﴿ أَقِمِ الصَّلَاةَ لِذِكْرِي ﴾", color = MaterialTheme.colorScheme.primary,
+            fontSize = 20.sp, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp), textAlign = TextAlign.Center)
     }
 }
+
+
 @Composable private fun PrayerPage(
     prayers: PrayerCalculation?, locate: () -> Unit, use24Hour: Boolean, showSunrise: Boolean,
     latitude: Double?, longitude: Double?, method: PrayerMethod, zone: ZoneId, hijriOffset: Int
@@ -638,50 +605,222 @@ private fun storeSavedSet(context: Context, key: String, values: Set<String>) {
             Triple(hijri, gregorian, times)
         }
     }
+    val todayDate = LocalDate.now()
     Page {
         Header("مواقيت الصلاة", "جدول الشهر الهجري كاملًا")
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { monthStart = monthStart.minus(1, ChronoUnit.MONTHS).with(ChronoField.DAY_OF_MONTH, 1) }) { Icon(Icons.Outlined.ChevronLeft, "الشهر السابق") }
+        Row(Modifier.fillMaxWidth().glass(RoundedCornerShape(24.dp)).padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            GlassIconButton(Icons.Outlined.ChevronLeft, "الشهر السابق",
+                { monthStart = monthStart.minus(1, ChronoUnit.MONTHS).with(ChronoField.DAY_OF_MONTH, 1) }, size = 40.dp)
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(monthStart.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale("ar"))), fontWeight = FontWeight.Bold, fontSize = 19.sp, color = MaterialTheme.colorScheme.primary)
+                Text(monthStart.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale("ar"))), fontWeight = FontWeight.ExtraBold, fontSize = 19.sp, color = MaterialTheme.colorScheme.primary)
                 Text("الشهر الهجري", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
             }
-            IconButton(onClick = { monthStart = monthStart.plus(1, ChronoUnit.MONTHS).with(ChronoField.DAY_OF_MONTH, 1) }) { Icon(Icons.Outlined.ChevronRight, "الشهر التالي") }
+            GlassIconButton(Icons.Outlined.ChevronRight, "الشهر التالي",
+                { monthStart = monthStart.plus(1, ChronoUnit.MONTHS).with(ChronoField.DAY_OF_MONTH, 1) }, size = 40.dp)
         }
         if (latitude == null || longitude == null) GlassCard(Modifier.fillMaxWidth()) {
-            Text("نحتاج إلى موقعك لحساب مواقيت الشهر بالكامل.", color = MaterialTheme.colorScheme.onSurface)
-            Button(onClick = locate) { Text("تحديد الموقع") }
+            Text("نحتاج إلى موقعك لحساب مواقيت الشهر بالكامل.", color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.End)
+            GoldButton("تحديد الموقع", locate, Modifier.fillMaxWidth(), Icons.Outlined.MyLocation)
         } else {
-            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("التاريخ الميلادي", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("التاريخ الهجري", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
             monthDays.forEach { (hijri, gregorian, times) ->
-                Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(13.dp), color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .55f))) {
-                    Column(Modifier.padding(11.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text(gregorian.format(DateTimeFormatter.ofPattern("EEE d/M", Locale("ar"))), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(hijri.format(DateTimeFormatter.ofPattern("d MMMM", Locale("ar"))), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                val isToday = gregorian == todayDate
+                Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(20.dp), isToday).padding(13.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text(gregorian.format(DateTimeFormatter.ofPattern("EEE d/M", Locale("ar"))), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (isToday) Text("اليوم", color = Lux.OnGold, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clip(RoundedCornerShape(50)).background(Lux.goldBrush).padding(horizontal = 9.dp, vertical = 3.dp))
+                            Text(hijri.format(DateTimeFormatter.ofPattern("d MMMM", Locale("ar"))), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
                         }
-                        if (times != null) {
-                            val visibleRows = rows(times).filter { showSunrise || it.first != "الشروق" }
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                visibleRows.forEach { (name, timeValue) ->
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(name, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Text(time(timeValue, use24Hour), fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-                                    }
+                    }
+                    if (times != null) {
+                        val visibleRows = rows(times).filter { showSunrise || it.first != "الشروق" }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            visibleRows.forEach { (name, timeValue) ->
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(name, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(time(timeValue, use24Hour), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 }
                             }
-                        } else Text("تعذر حساب المواقيت لهذا اليوم", fontSize = 10.sp, color = MaterialTheme.colorScheme.error)
-                    }
+                        }
+                    } else Text("تعذر حساب المواقيت لهذا اليوم", fontSize = 10.sp, color = MaterialTheme.colorScheme.error)
                 }
             }
         }
-        Text("المواقيت محسوبة حسب موقعك وطريقة الحساب المحددة في الإعدادات.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+        Text("المواقيت محسوبة حسب موقعك وطريقة الحساب المحددة في الإعدادات.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, textAlign = TextAlign.End)
     }
 }
+
+@Composable private fun StatTile(value: String, label: String, modifier: Modifier = Modifier, accent: Boolean = false) {
+    Column(modifier.glass(RoundedCornerShape(22.dp), accent).padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, color = if (accent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.ExtraBold, fontSize = 24.sp)
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable private fun ColumnScope.QiblaBody(relativeQibla: Float, correctedAzimuth: Float, bearing: Float?, azimuth: Float) {
+    val aligned = !relativeQibla.isNaN() && kotlin.math.abs(relativeQibla) < 4f
+    GlassCard(Modifier.fillMaxWidth(), emphasis = aligned) {
+        Box(Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.size(288.dp).graphicsLayer { rotationZ = if (correctedAzimuth.isNaN()) 0f else -correctedAzimuth },
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val r = size.minDimension / 2f
+                    drawCircle(
+                        brush = Brush.radialGradient(listOf(Color(0x3312A36B), Color(0x0A12A36B)), center = Offset(cx, cy), radius = r),
+                        radius = r, center = Offset(cx, cy)
+                    )
+                    drawCircle(color = Lux.Gold.copy(alpha = 0.6f), radius = r - 2.dp.toPx(), center = Offset(cx, cy), style = Stroke(2.dp.toPx()))
+                    drawCircle(color = Color.White.copy(alpha = 0.12f), radius = r * 0.60f, center = Offset(cx, cy), style = Stroke(1.dp.toPx()))
+                    val outer = r - 8.dp.toPx()
+                    for (tick in 0 until 72) {
+                        val angle = Math.toRadians(tick * 5.0)
+                        val major = tick % 6 == 0
+                        val inner = outer - if (major) 15.dp.toPx() else 7.dp.toPx()
+                        drawLine(
+                            color = if (major) Lux.Gold else Color.White.copy(alpha = 0.32f),
+                            start = Offset(cx + kotlin.math.sin(angle).toFloat() * inner, cy - kotlin.math.cos(angle).toFloat() * inner),
+                            end = Offset(cx + kotlin.math.sin(angle).toFloat() * outer, cy - kotlin.math.cos(angle).toFloat() * outer),
+                            strokeWidth = if (major) 2.dp.toPx() else 1.dp.toPx()
+                        )
+                    }
+                }
+                Text("شمال", color = Lux.Gold, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 30.dp))
+                Text("جنوب", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 30.dp))
+                Text("شرق", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp,
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 30.dp))
+                Text("غرب", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp,
+                    modifier = Modifier.align(Alignment.CenterStart).padding(start = 30.dp))
+            }
+            Icon(
+                Icons.Outlined.Navigation, "اتجاه القبلة",
+                tint = if (aligned) Lux.Emerald else Lux.Gold,
+                modifier = Modifier.size(112.dp).graphicsLayer { rotationZ = if (relativeQibla.isNaN()) 0f else relativeQibla }
+            )
+            Box(Modifier.size(20.dp).clip(CircleShape).background(Lux.goldBrush))
+        }
+        Text(
+            if (bearing == null) "حدد موقعك لحساب اتجاه القبلة"
+            else if (azimuth.isNaN()) "فعّل مستشعر البوصلة أو تحقق من الهاتف"
+            else if (aligned) "أنت الآن في اتجاه القبلة ✓"
+            else "حرّك الهاتف حتى يتجه المؤشر نحو القبلة",
+            color = if (aligned) Lux.OnGold else MaterialTheme.colorScheme.onSurface,
+            fontSize = 12.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
+            modifier = Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(50))
+                .then(if (aligned) Modifier.background(Lux.goldBrush) else Modifier.glass(RoundedCornerShape(50)))
+                .padding(horizontal = 16.dp, vertical = 9.dp)
+        )
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        StatTile(if (bearing == null) "--°" else "${bearing.roundToInt()}°", "زاوية القبلة من الشمال", Modifier.weight(1f), true)
+        StatTile(if (correctedAzimuth.isNaN()) "--°" else "${correctedAzimuth.roundToInt()}°", "اتجاه الهاتف", Modifier.weight(1f))
+    }
+    GlassCard(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconBadge(Icons.Outlined.Info, size = 40.dp)
+            Text("لأفضل دقة: أبعد الهاتف عن المعادن والمغناطيس، وعاير البوصلة بتحريك الهاتف على شكل رقم 8.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable private fun AdhkarPage(savedCategory: String, savedIndex: Int, savedCount: Int, save: (String, Int, Int) -> Unit) {
+    var category by remember(savedCategory) { mutableStateOf(savedCategory) }
+    var index by remember(savedCategory, savedIndex) { mutableIntStateOf(savedIndex) }
+    var count by remember(savedCategory, savedIndex, savedCount) { mutableIntStateOf(savedCount) }
+    val context = LocalContext.current
+    val favoriteId = "$category:$index"
+    val favoritesKey = "adhkar"
+    var favorite by remember(favoriteId) { mutableStateOf(savedSet(context, favoritesKey).contains(favoriteId)) }
+    val activeList = when (category) {
+        "بعد الصلاة" -> afterPrayerDhikr
+        else -> dhikrList
+    }
+    val safeIndex = index.coerceIn(activeList.indices)
+    val item = activeList[safeIndex]
+    val text = if (category == "المساء") item.eveningText ?: item.text else item.text
+    val tap: () -> Unit = {
+        if (count + 1 >= item.repetitions) {
+            count = 0
+            index = if (safeIndex < activeList.lastIndex) safeIndex + 1 else 0
+        } else count++
+        save(category, index, count)
+    }
+    Page {
+        Header("الأذكار", "ألا بذكر الله تطمئن القلوب")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("بعد الصلاة", "المساء", "الصباح").forEach { name ->
+                PillTab(name, category == name, {
+                    category = name; index = 0; count = 0; save(name, 0, 0)
+                }, Modifier.weight(1f))
+            }
+        }
+        GlassCard(Modifier.fillMaxWidth(), emphasis = true) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("التكرار ${item.repetitions}", color = Lux.OnGold, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(Lux.goldBrush).padding(horizontal = 11.dp, vertical = 4.dp))
+                Text("الذكر " + (safeIndex + 1) + " من " + activeList.size, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+            }
+            Text(text, color = MaterialTheme.colorScheme.onSurface, fontSize = 22.sp, lineHeight = 40.sp, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp))
+            if (item.source.isNotBlank()) Text("المصدر: " + item.source, color = MaterialTheme.colorScheme.primary, fontSize = 11.sp,
+                modifier = Modifier.align(Alignment.CenterHorizontally))
+        }
+        Box(Modifier.align(Alignment.CenterHorizontally).size(190.dp).clip(CircleShape).clickable(onClick = tap), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().glass(CircleShape))
+            ProgressRing((count.toFloat() / item.repetitions.coerceAtLeast(1)).coerceIn(0f, 1f), Modifier.fillMaxSize(), stroke = 9.dp)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("$count", color = MaterialTheme.colorScheme.onSurface, fontSize = 50.sp, fontWeight = FontWeight.ExtraBold)
+                Text("اضغط للتسبيح", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+            GlassIconButton(Icons.Outlined.SkipNext, "تخطي الذكر", { index = (safeIndex + 1) % activeList.size; count = 0; save(category, index, 0) })
+            GlassIconButton(Icons.Outlined.Refresh, "تصفير العداد", { count = 0; save(category, index, 0) })
+            GlassIconButton(Icons.Outlined.Share, "مشاركة الذكر", { shareText(context, "الذكر", text) })
+            GlassIconButton(Icons.Outlined.ContentCopy, "نسخ الذكر", { copyToClipboard(context, "الذكر", text) })
+            GlassIconButton(if (favorite) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder, "إضافة للمفضلة", {
+                val values = savedSet(context, favoritesKey)
+                if (favorite) values.remove(favoriteId) else values.add(favoriteId)
+                storeSavedSet(context, favoritesKey, values)
+                favorite = !favorite
+            }, tint = if (favorite) Lux.Gold else Color.Unspecified, active = favorite)
+        }
+    }
+}
+
+@Composable private fun MorePage(open: (String) -> Unit) {
+    val entries = listOf(
+        Triple("التقويم الهجري", "التاريخ والمناسبات", Icons.Outlined.CalendarMonth) to "calendar",
+        Triple("مواقيت الصلاة", "جدول الشهر الهجري", Icons.Outlined.AccessTime) to "prayer",
+        Triple("الأدعية", "من القرآن والسنة", Icons.Outlined.FavoriteBorder) to "duas",
+        Triple("السبحة", "عداد الذكر", Icons.Outlined.Fingerprint) to "tasbeeh",
+        Triple("المفضلة", "ما حفظته", Icons.Outlined.Favorite) to "favorites",
+        Triple("الإعدادات", "خصص تجربتك", Icons.Outlined.Settings) to "settings",
+        Triple("حول التطبيق", "AL-SALAH by MAS", Icons.Outlined.Info) to "about"
+    )
+    Page {
+        Header("اكتشف المزيد", "أدواتك اليومية في مكان واحد")
+        entries.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                pair.forEach { (entry, key) ->
+                    FeatureTile(entry.first, entry.second, entry.third, Modifier.weight(1f)) { open(key) }
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
 @Composable private fun QiblaPage(bearing: Float?, declination: Float) {
     val context = LocalContext.current
     var azimuth by remember { mutableFloatStateOf(Float.NaN) }
@@ -723,225 +862,7 @@ private fun storeSavedSet(context: Context, key: String, values: Set<String>) {
         else ((bearing - correctedAzimuth + 540f) % 360f) - 180f
     Page {
         Header("اتجاه القبلة", "بوصلة تفاعلية لتحديد اتجاه الكعبة")
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            shadowElevation = 2.dp
-        ) {
-            Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(13.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
-                        Icon(Icons.Outlined.Explore, null, tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(10.dp).size(22.dp))
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("بوصلة القبلة", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text("تحديث مباشر من مستشعرات الهاتف", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-                    }
-                }
-                Box(Modifier.fillMaxWidth().height(310.dp), contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(270.dp), contentAlignment = Alignment.Center) {
-                        Surface(
-                            modifier = Modifier.size(258.dp).graphicsLayer {
-                                rotationZ = if (correctedAzimuth.isNaN()) 0f else -correctedAzimuth
-                            },
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
-                            shadowElevation = 4.dp
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Canvas(Modifier.fillMaxSize()) {
-                                    val cx = size.width / 2f
-                                    val cy = size.height / 2f
-                                    val outerRadius = size.minDimension * 0.455f
-                                    for (tick in 0 until 60) {
-                                        val angle = Math.toRadians(tick * 6.0)
-                                        val major = tick % 5 == 0
-                                        val innerRadius = outerRadius - if (major) 13.dp.toPx() else 7.dp.toPx()
-                                        val x1 = cx + kotlin.math.sin(angle).toFloat() * innerRadius
-                                        val y1 = cy - kotlin.math.cos(angle).toFloat() * innerRadius
-                                        val x2 = cx + kotlin.math.sin(angle).toFloat() * outerRadius
-                                        val y2 = cy - kotlin.math.cos(angle).toFloat() * outerRadius
-                                        drawLine(
-                                            color = if (major) Color(0xFF176B62) else Color(0xFFB7C5BF),
-                                            start = androidx.compose.ui.geometry.Offset(x1, y1),
-                                            end = androidx.compose.ui.geometry.Offset(x2, y2),
-                                            strokeWidth = if (major) 2.dp.toPx() else 1.dp.toPx()
-                                        )
-                                    }
-                                }
-                                Icon(Icons.Outlined.Explore, null,
-                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                                    modifier = Modifier.size(224.dp))
-                                Text("شمال", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp,
-                                    fontWeight = FontWeight.ExtraBold, modifier = Modifier.align(Alignment.TopCenter).padding(top = 17.dp))
-                                Text("جنوب", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp,
-                                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 17.dp))
-                                Text("شرق", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp,
-                                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 17.dp))
-                                Text("غرب", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp,
-                                    modifier = Modifier.align(Alignment.CenterStart).padding(start = 17.dp))
-                                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface,
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
-                                    Icon(Icons.Outlined.Navigation, null, tint = MaterialTheme.colorScheme.secondary,
-                                        modifier = Modifier.padding(15.dp).size(32.dp))
-                                }
-                            }
-                        }
-                        if (!relativeQibla.isNaN()) {
-                            Icon(Icons.Outlined.Navigation, "اتجاه القبلة",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(92.dp).graphicsLayer { rotationZ = relativeQibla })
-                        } else {
-                            Icon(Icons.Outlined.Navigation, null, tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(76.dp))
-                        }
-                    }
-                    Surface(
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.primary
-                    ) {
-                        Text(
-                            if (bearing == null) "حدد موقعك لحساب اتجاه القبلة"
-                            else if (azimuth.isNaN()) "فعّل مستشعر البوصلة أو تحقق من الهاتف"
-                            else "حرّك الهاتف حتى يتجه المؤشر نحو القبلة",
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
-                        )
-                    }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Surface(Modifier.weight(1f), shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant) {
-                        Column(Modifier.padding(13.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(if (correctedAzimuth.isNaN()) "--°" else "${correctedAzimuth.roundToInt()}°",
-                                color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 21.sp)
-                            Text("اتجاه الهاتف", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
-                        }
-                    }
-                    Surface(Modifier.weight(1f), shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant) {
-                        Column(Modifier.padding(13.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(if (bearing == null) "--°" else "${bearing.roundToInt()}°",
-                                color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 21.sp)
-                            Text("زاوية القبلة من الشمال", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
-                        }
-                    }
-                }
-            }
-        }
-        GlassCard(Modifier.fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.primary)
-                Text("لأفضل دقة: أبعد الهاتف عن المعادن والمغناطيس، وعاير البوصلة بتحريك الهاتف على شكل رقم 8. دقة الاتجاه تعتمد على جودة مستشعر هاتفك.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, textAlign = TextAlign.End)
-            }
-        }
-    }
-}
-@Composable private fun AdhkarPage(savedCategory: String, savedIndex: Int, savedCount: Int, save: (String, Int, Int) -> Unit) {
-    var category by remember(savedCategory) { mutableStateOf(savedCategory) }
-    var index by remember(savedCategory, savedIndex) { mutableIntStateOf(savedIndex) }
-    var count by remember(savedCategory, savedIndex, savedCount) { mutableIntStateOf(savedCount) }
-    val context = LocalContext.current
-    val favoriteId = "$category:$index"
-    val favoritesKey = "adhkar"
-    var favorite by remember(favoriteId) { mutableStateOf(savedSet(context, favoritesKey).contains(favoriteId)) }
-    val activeList = when (category) {
-        "بعد الصلاة" -> afterPrayerDhikr
-        else -> dhikrList
-    }
-    val safeIndex = index.coerceIn(activeList.indices)
-    val item = activeList[safeIndex]
-    val text = if (category == "المساء") item.eveningText ?: item.text else item.text
-    Page {
-        Header("الأذكار", "ألا بذكر الله تطمئن القلوب")
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            listOf("الصباح", "المساء", "بعد الصلاة").forEach { name ->
-                FilterChip(selected = category == name, onClick = {
-                    category = name; index = 0; count = 0; save(name, 0, 0)
-                }, label = { Text(name) })
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        GlassCard(Modifier.fillMaxWidth()) {
-            Text("الذكر " + (safeIndex + 1) + " من " + activeList.size, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.End))
-            Text(text, color = MaterialTheme.colorScheme.onSurface, fontSize = 22.sp, lineHeight = 38.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp))
-            Text("التكرار المطلوب: " + item.repetitions, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.CenterHorizontally))
-            if (item.source.isNotBlank()) Text("المصدر: " + item.source, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
-            Text("$count", color = MaterialTheme.colorScheme.onSurface, fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.align(Alignment.CenterHorizontally))
-            LinearProgressIndicator(
-                progress = { (count.toFloat() / item.repetitions.coerceAtLeast(1)).coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(4.dp),
-                color = MaterialTheme.colorScheme.onSurface,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = {
-                    val values = savedSet(context, favoritesKey)
-                    if (favorite) values.remove(favoriteId) else values.add(favoriteId)
-                    storeSavedSet(context, favoritesKey, values)
-                    favorite = !favorite
-                }) { Icon(if (favorite) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder, "إضافة للمفضلة", tint = MaterialTheme.colorScheme.onSurface) }
-                IconButton(onClick = { copyToClipboard(context, "الذكر", text) }) { Icon(Icons.Outlined.ContentCopy, "نسخ الذكر", tint = MaterialTheme.colorScheme.onSurface) }
-                IconButton(onClick = { shareText(context, "الذكر", text) }) { Icon(Icons.Outlined.Share, "مشاركة الذكر", tint = MaterialTheme.colorScheme.onSurface) }
-            }
-            Button(onClick = {
-                if (count + 1 >= item.repetitions) {
-                    count = 0
-                    index = if (safeIndex < activeList.lastIndex) safeIndex + 1 else 0
-                } else count++
-                save(category, index, count)
-            }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("تسبيح / التالي") }
-            TextButton(onClick = { count = 0; save(category, index, 0) }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("تصفير العداد") }
-            TextButton(onClick = { index = (safeIndex + 1) % activeList.size; count = 0; save(category, index, 0) }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("تخطي الذكر") }
-        }
-    }
-}
-@Composable private fun MorePage(open: (String) -> Unit) {
-    val entries = listOf(
-        Triple("التقويم الهجري", "التاريخ والمناسبات", Icons.Outlined.CalendarMonth) to "calendar",
-        Triple("مواقيت الصلاة", "جدول الشهر الهجري", Icons.Outlined.AccessTime) to "prayer",
-        Triple("الأدعية", "من القرآن والسنة", Icons.Outlined.FavoriteBorder) to "duas",
-        Triple("السبحة", "عداد الذكر", Icons.Outlined.Fingerprint) to "tasbeeh",
-        Triple("المفضلة", "ما حفظته", Icons.Outlined.Favorite) to "favorites",
-        Triple("الإعدادات", "خصص تجربتك", Icons.Outlined.Settings) to "settings",
-        Triple("حول التطبيق", "AL-SALAH by MAS", Icons.Outlined.Info) to "about"
-    )
-    Page {
-        Header("اكتشف المزيد", "أدواتك اليومية في مكان واحد")
-        Spacer(Modifier.height(4.dp))
-        entries.chunked(2).forEach { pair ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-                pair.forEach { (entry, key) ->
-                    Surface(
-                        onClick = { open(key) },
-                        modifier = Modifier.weight(1f).heightIn(min = 116.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-                    ) {
-                        Column(Modifier.fillMaxWidth().padding(14.dp),
-                            horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-                                Icon(entry.third, null, tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(9.dp).size(22.dp))
-                            }
-                            Text(entry.first, color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text(entry.second, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
-                        }
-                    }
-                }
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
-            }
-        }
+        QiblaBody(relativeQibla, correctedAzimuth, bearing, azimuth)
     }
 }
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1002,24 +923,7 @@ private fun storeSavedSet(context: Context, key: String, values: Set<String>) {
             entries.chunked(2).forEach { pair ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     pair.forEach { (entry, icon) ->
-                        Surface(
-                            onClick = { section = entry.first },
-                            modifier = Modifier.weight(1f).heightIn(min = 112.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-                        ) {
-                            Column(Modifier.fillMaxWidth().padding(13.dp),
-                                horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                                Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-                                    Icon(icon, null, tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(9.dp).size(21.dp))
-                                }
-                                Text(entry.second, color = MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Text(entry.third, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
-                            }
-                        }
+                        FeatureTile(entry.second, entry.third, icon, Modifier.weight(1f)) { section = entry.first }
                     }
                     if (pair.size == 1) Spacer(Modifier.weight(1f))
                 }
@@ -1389,6 +1293,13 @@ private fun SettingSwitchRow(
     }
 }
 
+
+
+
+
+
+
+
 @Composable
 private fun QuickTile(
     title: String,
@@ -1397,56 +1308,44 @@ private fun QuickTile(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
-        shadowElevation = 2.dp
+    Column(
+        modifier.glass(RoundedCornerShape(24.dp)).clickable(onClick = onClick).padding(16.dp),
+        horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.End) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(25.dp))
-            Spacer(Modifier.height(9.dp))
-            Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-        }
+        IconBadge(icon, size = 44.dp)
+        Spacer(Modifier.height(4.dp))
+        Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+        Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
     }
 }
 
 @Composable
 private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.84f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.78f)),
-        shadowElevation = 13.dp
+    val dark = isDarkTheme()
+    val shape = RoundedCornerShape(30.dp)
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)
+            .clip(shape)
+            .background(if (dark) Color(0xEE07190F) else Color(0xF2FFFFFF))
+            .border(1.dp, Brush.linearGradient(listOf(Lux.Gold.copy(alpha = if (dark) 0.5f else 0.7f), Color.White.copy(alpha = 0.06f), Lux.Gold.copy(alpha = 0.3f))), shape)
+            .padding(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 4.dp, vertical = 7.dp).animateContentSize(tween(180)),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Tab.values().forEach { item ->
-                val active = item == selected
-                Surface(
-                    onClick = { onSelect(item) },
-                    shape = RoundedCornerShape(15.dp),
-                    color = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
-                ) {
-                    Column(
-                        Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(item.icon, contentDescription = item.label,
-                            tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp))
-                        Text(item.label, fontSize = 9.sp,
-                            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal)
-                    }
-                }
+        Tab.values().reversed().forEach { item ->
+            val active = item == selected
+            Column(
+                Modifier.weight(1f).clip(RoundedCornerShape(24.dp))
+                    .then(if (active) Modifier.background(Lux.goldBrush) else Modifier)
+                    .clickable { onSelect(item) }.padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(item.icon, contentDescription = item.label,
+                    tint = if (active) Lux.OnGold else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp))
+                Text(item.label, fontSize = 10.sp, maxLines = 1,
+                    color = if (active) Lux.OnGold else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Medium)
             }
         }
     }
@@ -1467,57 +1366,51 @@ private fun TasbeehPage(initialCount: Int, target: Int, save: (Int, Int) -> Unit
     var completedRounds by remember { mutableIntStateOf(0) }
     val current = adhkar[index]
     val context = LocalContext.current
+    val tap: () -> Unit = {
+        if (count + 1 >= goal) {
+            count = 0
+            completedRounds++
+            index = (index + 1) % adhkar.size
+            save(0, goal)
+            Toast.makeText(context, "اكتمل الذكر، انتقلنا إلى الذكر التالي", Toast.LENGTH_SHORT).show()
+        } else {
+            count++
+            save(count, goal)
+        }
+    }
     Page {
         Header("السبحة الإلكترونية", "ورد متنوع وعدّاد يحفظ تقدمك", back)
-        GlassCard(Modifier.fillMaxWidth()) {
-            Text("الذكر الحالي", color = MaterialTheme.colorScheme.onSurfaceVariant,
+        GlassCard(Modifier.fillMaxWidth(), emphasis = true) {
+            Text("الذكر الحالي", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp,
                 modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
             Text(current.first, color = MaterialTheme.colorScheme.primary, fontSize = 25.sp,
                 lineHeight = 42.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp))
-            Text("$count", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurface, fontSize = 64.sp, fontWeight = FontWeight.ExtraBold)
-            Text("من $goal", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-            LinearProgressIndicator(
-                progress = { (count.toFloat() / goal.coerceAtLeast(1)).coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(7.dp).clip(CircleShape)
-            )
-            Text("اختر العدد المستهدف", color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                listOf(33, 34, 99, 100, 1000).forEach { amount ->
-                    FilterChip(selected = goal == amount, onClick = { goal = amount; count = 0; save(0, amount) },
-                        label = { Text(amount.toString()) })
-                    Spacer(Modifier.width(4.dp))
-                }
-            }
-            Button(onClick = {
-                if (count + 1 >= goal) {
-                    count = 0
-                    completedRounds++
-                    index = (index + 1) % adhkar.size
-                    save(0, goal)
-                    Toast.makeText(context, "اكتمل الذكر، انتقلنا إلى الذكر التالي", Toast.LENGTH_SHORT).show()
-                } else {
-                    count++
-                    save(count, goal)
-                }
-            }, modifier = Modifier.fillMaxWidth().height(58.dp), shape = RoundedCornerShape(18.dp)) {
-                Icon(Icons.Outlined.Fingerprint, null)
-                Spacer(Modifier.width(8.dp))
-                Text("تسبيح", fontSize = 18.sp)
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { if (count > 0) { count--; save(count, goal) } }, modifier = Modifier.weight(1f)) { Text("تراجع") }
-                OutlinedButton(onClick = { count = 0; save(0, goal) }, modifier = Modifier.weight(1f)) { Text("تصفير") }
-            }
-            Text("الذكر ${index + 1} من ${adhkar.size} • مرات إتمام الورد: $completedRounds",
-                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp,
-                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-            TextButton(onClick = { index = (index + 1) % adhkar.size; count = 0; save(0, goal) },
-                modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("تخطي إلى الذكر التالي") }
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
         }
+        Box(Modifier.align(Alignment.CenterHorizontally).size(240.dp).clip(CircleShape).clickable(onClick = tap), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().glass(CircleShape, true))
+            ProgressRing((count.toFloat() / goal.coerceAtLeast(1)).coerceIn(0f, 1f), Modifier.fillMaxSize(), stroke = 11.dp)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("$count", color = MaterialTheme.colorScheme.onSurface, fontSize = 68.sp, fontWeight = FontWeight.ExtraBold)
+                Text("من $goal", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                Icon(Icons.Outlined.Fingerprint, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 6.dp).size(26.dp))
+            }
+        }
+        Text("اختر العدد المستهدف", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp,
+            modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(1000, 100, 99, 34, 33).forEach { amount ->
+                PillTab(amount.toString(), goal == amount, { goal = amount; count = 0; save(0, amount) }, Modifier.weight(1f))
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            GlassButton("تخطي", { index = (index + 1) % adhkar.size; count = 0; save(0, goal) }, Modifier.weight(1f), Icons.Outlined.SkipNext)
+            GlassButton("تصفير", { count = 0; save(0, goal) }, Modifier.weight(1f), Icons.Outlined.Refresh)
+            GlassButton("تراجع", { if (count > 0) { count--; save(count, goal) } }, Modifier.weight(1f), Icons.Outlined.Undo)
+        }
+        Text("الذكر ${index + 1} من ${adhkar.size} • مرات إتمام الورد: $completedRounds",
+            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp,
+            modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
     }
 }
 
@@ -1526,7 +1419,11 @@ private fun FavoritesPage(back: () -> Unit) {
     Page {
         Header("المفضلة", "العناصر التي تحفظها للرجوع إليها", back)
         GlassCard(Modifier.fillMaxWidth()) {
-            Text("لا توجد عناصر محفوظة حتى الآن", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.fillMaxWidth().padding(vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                IconBadge(Icons.Outlined.FavoriteBorder, size = 62.dp)
+                Text("لا توجد عناصر محفوظة حتى الآن", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
@@ -1535,12 +1432,17 @@ private fun FavoritesPage(back: () -> Unit) {
 private fun AboutPage(back: () -> Unit) {
     Page {
         Header("عن التطبيق", "AL-SALAH", back)
-        GlassCard(Modifier.fillMaxWidth()) {
-            Text("تطبيق الصلاة من MAS", fontSize = 20.sp, fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary)
-            Text("مواقيت الصلاة، اتجاه القبلة، الأذكار والتنبيهات في مكان واحد.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("الإصدار 2.0.0", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        GlassCard(Modifier.fillMaxWidth(), emphasis = true) {
+            Column(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Image(painterResource(R.drawable.logo_full), contentDescription = "شعار الصلاة",
+                    modifier = Modifier.size(132.dp).clip(RoundedCornerShape(34.dp)), contentScale = ContentScale.Fit)
+                Text("تطبيق الصلاة من MAS", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.primary)
+                Text("مواقيت الصلاة، اتجاه القبلة، الأذكار والتنبيهات في مكان واحد.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                Text("الإصدار 3.0.0", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+            }
         }
     }
 }
@@ -1557,23 +1459,24 @@ private fun CalendarPage(back: () -> Unit, hijriOffset: Int) {
     val today = LocalDate.now()
     Page {
         Header("التقويم الهجري والميلادي", "الشهر كاملًا بالتاريخين معًا", back)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { displayedMonth = displayedMonth.minusMonths(1) }) { Icon(Icons.Outlined.ChevronLeft, "الشهر السابق") }
-            Text(displayedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale("ar"))), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            IconButton(onClick = { displayedMonth = displayedMonth.plusMonths(1) }) { Icon(Icons.Outlined.ChevronRight, "الشهر التالي") }
+        Row(Modifier.fillMaxWidth().glass(RoundedCornerShape(24.dp)).padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            GlassIconButton(Icons.Outlined.ChevronLeft, "الشهر السابق", { displayedMonth = displayedMonth.minusMonths(1) }, size = 40.dp)
+            Text(displayedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale("ar"))), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+            GlassIconButton(Icons.Outlined.ChevronRight, "الشهر التالي", { displayedMonth = displayedMonth.plusMonths(1) }, size = 40.dp)
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            listOf("ح", "ن", "ث", "ر", "خ", "ج", "س").forEach { Text(it, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            listOf("ح", "ن", "ث", "ر", "خ", "ج", "س").forEach { Text(it, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }
         }
         cells.chunked(7).forEach { week ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 week.forEach { date ->
-                    Box(Modifier.weight(1f).height(62.dp).clip(RoundedCornerShape(10.dp))
-                        .background(if (date == today) MaterialTheme.colorScheme.primary.copy(alpha = .14f) else MaterialTheme.colorScheme.surface)
+                    Box(Modifier.weight(1f).height(60.dp)
+                        .then(if (date == null) Modifier else Modifier.glass(RoundedCornerShape(14.dp), date == today))
                         .padding(3.dp), contentAlignment = Alignment.Center) {
                         if (date != null) {
                             val hijri = HijrahDate.from(date).plus(hijriOffset.toLong(), ChronoUnit.DAYS)
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(date.dayOfMonth.toString(), fontSize = 15.sp, fontWeight = if (date == today) FontWeight.ExtraBold else FontWeight.Medium,
                                     color = if (date == today) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                                 Text(hijri.get(ChronoField.DAY_OF_MONTH).toString(), fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
@@ -1584,11 +1487,11 @@ private fun CalendarPage(back: () -> Unit, hijriOffset: Int) {
             }
         }
         GlassCard(Modifier.fillMaxWidth()) {
-            Text("الميلادي بالأعلى والهجري بالأسفل داخل كل يوم.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+            Text("الميلادي بالأعلى والهجري بالأسفل داخل كل يوم.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, textAlign = TextAlign.End)
             Text("اليوم: " + HijrahDate.now().plus(hijriOffset.toLong(), ChronoUnit.DAYS).format(DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", Locale("ar"))) + " هـ",
-                color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
             Text(LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", Locale("ar"))) + " م",
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End)
         }
     }
 }
@@ -1621,18 +1524,23 @@ private fun DuasPage(back: () -> Unit) {
         Header("الأدعية", "مختارات من القرآن الكريم والسنة النبوية", back)
         OutlinedTextField(value = query, onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth(), singleLine = true,
-            leadingIcon = { Icon(Icons.Outlined.Search, null) }, placeholder = { Text("ابحث في الأدعية") })
+            shape = RoundedCornerShape(20.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = Color.White.copy(alpha = 0.22f),
+                focusedContainerColor = Color.White.copy(alpha = 0.07f), unfocusedContainerColor = Color.White.copy(alpha = 0.05f)),
+            leadingIcon = { Icon(Icons.Outlined.Search, null, tint = MaterialTheme.colorScheme.primary) }, placeholder = { Text("ابحث في الأدعية") })
         Text("${filtered.size} دعاء", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
         filtered.forEachIndexed { index, item ->
             GlassCard(Modifier.fillMaxWidth()) {
-                Text("دعاء ${index + 1}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Text("دعاء ${index + 1}", color = Lux.OnGold, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(Lux.goldBrush).padding(horizontal = 11.dp, vertical = 3.dp))
                 Text(item.first, color = MaterialTheme.colorScheme.onSurface, fontSize = 19.sp,
                     lineHeight = 34.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { shareText(context, "دعاء", item.first) }) { Icon(Icons.Outlined.Share, "مشاركة الدعاء") }
+                    GlassIconButton(Icons.Outlined.Share, "مشاركة الدعاء", { shareText(context, "دعاء", item.first) }, size = 40.dp)
                     Text(item.second, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-                    IconButton(onClick = { copyToClipboard(context, "دعاء", item.first) }) { Icon(Icons.Outlined.ContentCopy, "نسخ الدعاء") }
+                    GlassIconButton(Icons.Outlined.ContentCopy, "نسخ الدعاء", { copyToClipboard(context, "دعاء", item.first) }, size = 40.dp)
                 }
             }
         }
