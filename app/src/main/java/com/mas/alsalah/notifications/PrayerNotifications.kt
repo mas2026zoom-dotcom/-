@@ -2,7 +2,6 @@ package com.mas.alsalah.notifications
 
 import android.app.AlarmManager
 import android.media.AudioFocusRequest
-import android.media.MediaPlayer
 import android.media.AudioManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
