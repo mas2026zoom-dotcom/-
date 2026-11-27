@@ -3,6 +3,7 @@ package com.mas.alsalah
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.BitmapFactory
+import android.util.Log
 import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -39,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -62,6 +64,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -226,18 +230,53 @@ private val QuranInk = Color(0xFF14251D)
 private val QuranGreen = Color(0xFF0B6B4A)
 
 private object QuranPages {
-    private val cache = object : LruCache<String, ImageBitmap>(4) {}
+    private val cache = object : LruCache<String, ImageBitmap>(cacheBytes()) {
+        override fun sizeOf(key: String, value: ImageBitmap): Int = value.width * value.height * 4
+    }
+    private val gate = Semaphore(1)
+
+    private fun cacheBytes(): Int {
+        val budget = (Runtime.getRuntime().maxMemory() / 6).toInt()
+        return budget.coerceIn(24 * 1024 * 1024, 96 * 1024 * 1024)
+    }
+
+    fun cached(page: Int): ImageBitmap? = cache.get("p" + page)
 
     suspend fun load(context: Context, page: Int): ImageBitmap? = withContext(Dispatchers.IO) {
-        val key = "p$page"
-        cache.get(key)?.let { return@withContext it }
-        val bitmap = runCatching {
-            context.assets.open("quran/pages/p%03d.png".format(page)).use { stream ->
-                BitmapFactory.decodeStream(stream)
-            }?.asImageBitmap()
-        }.getOrNull()
-        if (bitmap != null) cache.put(key, bitmap)
-        bitmap
+        val key = "p" + page
+        val hit = cache.get(key)
+        if (hit != null) return@withContext hit
+        var decoded: ImageBitmap? = null
+        gate.withPermit {
+            val again = cache.get(key)
+            if (again != null) {
+                decoded = again
+            } else {
+                val fresh = decode(context, page)
+                if (fresh != null) cache.put(key, fresh)
+                decoded = fresh
+            }
+        }
+        decoded
+    }
+
+    private fun decode(context: Context, page: Int): ImageBitmap? = try {
+        context.assets.open("quran/pages/p%03d.png".format(page)).use { stream ->
+            val options = BitmapFactory.Options().apply {
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+                inScaled = false
+            }
+            BitmapFactory.decodeStream(stream, null, options)?.asImageBitmap()
+        }
+    } catch (t: Throwable) {
+        Log.w("QuranPages", "decode failed for page " + page, t)
+        null
+    }
+
+    suspend fun prefetch(context: Context, page: Int) {
+        if (page < 1 || page > 604) return
+        if (cache.get("p" + page) != null) return
+        runCatching { load(context, page) }
     }
 }
 
@@ -648,7 +687,7 @@ internal fun MushafScreen(startPage: Int, back: () -> Unit) {
             state = pager,
             modifier = Modifier.weight(1f).fillMaxWidth(),
             reverseLayout = true,
-            beyondViewportPageCount = 1
+            beyondViewportPageCount = 0
         ) { index ->
             MushafPageImage(index + 1)
         }
@@ -658,21 +697,36 @@ internal fun MushafScreen(startPage: Int, back: () -> Unit) {
 @Composable
 private fun MushafPageImage(page: Int) {
     val context = LocalContext.current
-    val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = page) {
-        value = QuranPages.load(context, page)
+    var attempt by remember(page) { mutableIntStateOf(0) }
+    var failed by remember(page, attempt) { mutableStateOf(false) }
+    val bitmap by produceState<ImageBitmap?>(initialValue = QuranPages.cached(page), key1 = page, key2 = attempt) {
+        if (value == null) {
+            val loaded = QuranPages.load(context, page)
+            value = loaded
+            failed = loaded == null
+        }
+        if (value != null) {
+            QuranPages.prefetch(context, page + 1)
+            QuranPages.prefetch(context, page - 1)
+        }
     }
     Box(Modifier.fillMaxSize().background(QuranPaper), contentAlignment = Alignment.Center) {
         val image = bitmap
-        if (image == null) {
-            CircularProgressIndicator(color = QuranInk.copy(alpha = 0.35f), modifier = Modifier.size(28.dp))
-        } else {
-            Image(
+        when {
+            image != null -> Image(
                 bitmap = image,
                 contentDescription = "صفحة " + arabicNumber(page),
                 modifier = Modifier.fillMaxWidth(),
-                contentScale = ContentScale.FillWidth,
-                colorFilter = ColorFilter.tint(QuranInk, BlendMode.SrcIn)
+                contentScale = ContentScale.FillWidth
             )
+            failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("تعذر تحميل الصفحة", color = QuranInk.copy(alpha = 0.7f), fontSize = 14.sp)
+                Spacer(Modifier.height(6.dp))
+                TextButton(onClick = { attempt += 1 }) {
+                    Text("إعادة المحاولة", color = QuranGreen, fontSize = 14.sp)
+                }
+            }
+            else -> CircularProgressIndicator(color = QuranInk.copy(alpha = 0.35f), modifier = Modifier.size(28.dp))
         }
     }
 }
