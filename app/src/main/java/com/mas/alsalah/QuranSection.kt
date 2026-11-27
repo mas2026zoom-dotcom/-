@@ -46,6 +46,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +55,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -97,6 +99,34 @@ internal class QuranData(
     }
 
     fun juzOf(page: Int): QuranJuz = juzs.lastOrNull { it.page <= page } ?: juzs.first()
+
+    fun startOf(page: Int): Pair<Int, Int> {
+        val key = pageStarts[(page - 1).coerceIn(0, pageStarts.size - 1)]
+        return (key / 1000) to (key % 1000)
+    }
+
+    fun versesOfPage(page: Int): List<Pair<Int, Int>> {
+        val start = startOf(page)
+        val end = if (page < pageStarts.size) startOf(page + 1) else null
+        val out = ArrayList<Pair<Int, Int>>()
+        var surah = start.first
+        var ayah = start.second
+        var guard = 0
+        while (guard < 40) {
+            guard += 1
+            if (end != null && (surah > end.first || (surah == end.first && ayah >= end.second))) break
+            out.add(surah to ayah)
+            val maxAyah = surahs.firstOrNull { it.number == surah }?.ayahs ?: 0
+            if (ayah >= maxAyah) {
+                surah += 1
+                ayah = 1
+                if (surah > 114) break
+            } else {
+                ayah += 1
+            }
+        }
+        return out
+    }
 }
 
 internal object QuranRepo {
@@ -297,7 +327,7 @@ private fun QuranTabs(selected: Int, onSelect: (Int) -> Unit) {
                 Spacer(Modifier.height(6.dp))
                 Box(
                     Modifier.width(54.dp).height(2.5.dp).clip(RoundedCornerShape(2.dp))
-                        .background(if (active) Lux.goldBrush else Color.Transparent)
+                        .background(if (active) Lux.goldBrush else SolidColor(Color.Transparent))
                 )
             }
         }
@@ -574,22 +604,16 @@ internal fun MushafScreen(startPage: Int, back: () -> Unit) {
     val page = pager.currentPage + 1
     val surah = data?.surahOf(page)
     val juz = data?.juzOf(page)
+    val marked = bookmarks.contains(page)
 
     LaunchedEffect(page) { prefs.edit().putInt("last_page", page).apply() }
 
     Column(Modifier.fillMaxSize().background(QuranPaper)) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClick = back), contentAlignment = Alignment.Center) {
-                Icon(Icons.Outlined.ArrowBack, "رجوع", tint = QuranGreen, modifier = Modifier.size(22.dp))
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(surah?.name ?: "", color = QuranGreen, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                Text("الجزء " + arabicNumber(juz?.number ?: 1), color = QuranInk.copy(alpha = 0.62f), fontSize = 11.sp)
-            }
-            val marked = bookmarks.contains(page)
             Box(
                 Modifier.size(40.dp).clip(CircleShape).clickable {
                     val next = if (marked) bookmarks - page else bookmarks + page
@@ -600,10 +624,26 @@ internal fun MushafScreen(startPage: Int, back: () -> Unit) {
             ) {
                 Icon(
                     if (marked) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
-                    "حفظ الصفحة", tint = if (marked) Lux.GoldDeep else QuranGreen, modifier = Modifier.size(22.dp)
+                    "حفظ الصفحة",
+                    tint = if (marked) Lux.GoldDeep else QuranGreen,
+                    modifier = Modifier.size(22.dp)
                 )
             }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(surah?.name ?: "", color = QuranGreen, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "صفحة " + arabicNumber(page) + "، جزء " + arabicNumber(juz?.number ?: 1),
+                    color = QuranInk.copy(alpha = 0.62f), fontSize = 11.sp
+                )
+            }
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).clickable(onClick = back),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Outlined.ArrowBack, "رجوع", tint = QuranGreen, modifier = Modifier.size(22.dp))
+            }
         }
+
         HorizontalPager(
             state = pager,
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -611,13 +651,6 @@ internal fun MushafScreen(startPage: Int, back: () -> Unit) {
             beyondViewportPageCount = 1
         ) { index ->
             MushafPageImage(index + 1)
-        }
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("صفحة " + arabicNumber(page), color = QuranInk.copy(alpha = 0.75f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Text(surah?.name ?: "", color = QuranGreen.copy(alpha = 0.85f), fontSize = 11.sp)
         }
     }
 }
@@ -631,7 +664,7 @@ private fun MushafPageImage(page: Int) {
     Box(Modifier.fillMaxSize().background(QuranPaper), contentAlignment = Alignment.Center) {
         val image = bitmap
         if (image == null) {
-            CircularProgressIndicator(color = QuranGreen.copy(alpha = 0.5f), modifier = Modifier.size(28.dp))
+            CircularProgressIndicator(color = QuranInk.copy(alpha = 0.35f), modifier = Modifier.size(28.dp))
         } else {
             Image(
                 bitmap = image,
