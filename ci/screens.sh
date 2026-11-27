@@ -80,7 +80,7 @@ adb shell am start -S -n $PKG/.MainActivity --es open quran --es tab juz; sleep 
 adb shell am start -S -n $PKG/.MainActivity --es open quran --es tab bookmarks; sleep 8; shot 16-quran-bookmarks
 adb shell am start -S -n $PKG/.MainActivity --es open quran --es download 1; sleep 6; shot 25-quran-download-progress
 ready=0
-for try in 1 2 3 4 5 6 7 8 9 10; do
+for try in $(seq 1 45); do
   sleep 20
   adb shell am start -S -n $PKG/.MainActivity --es open mushaf:1 > /dev/null 2>&1
   sleep 6
