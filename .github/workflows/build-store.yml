@@ -62,7 +62,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp store/build/outputs/apk/debug/app-debug.apk mas-store-debug.apk
+          cp store/build/outputs/apk/debug/*.apk mas-store-debug.apk
           gh release delete store-apk --yes --cleanup-tag || true
           gh release create store-apk mas-store-debug.apk --title "MAS STORE debug APK" --notes "Debug build" --target "$GITHUB_SHA"
   screens:
