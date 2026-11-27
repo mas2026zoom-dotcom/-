@@ -208,7 +208,7 @@ private val duas = listOf(
     val viewModel: AppViewModel = viewModel()
     val settings by viewModel.settings.collectAsState()
     var tab by remember { mutableStateOf(Tab.HOME) }
-    var page by remember { mutableStateOf("") }
+    var page by remember { mutableStateOf((context as? android.app.Activity)?.intent?.getStringExtra("open").orEmpty()) }
     val pageStack = remember { mutableStateListOf<String>() }
     val tabStack = remember { mutableStateListOf<Tab>() }
     var city by remember(settings.city) { mutableStateOf(settings.city) }
@@ -354,7 +354,15 @@ private val duas = listOf(
                                 "about" -> AboutPage(goBack)
                                 "calendar" -> CalendarPage(goBack, settings.hijriDayOffset)
                                 "duas" -> DuasPage(goBack)
-                                "quran" -> QuranSection(open = { openPage("mushaf:$it") }, back = goBack)
+                                "quran" -> QuranSection(
+                                    open = { openPage("mushaf:$it") },
+                                    back = goBack,
+                                    initialTab = when ((context as? android.app.Activity)?.intent?.getStringExtra("tab")) {
+                                        "juz" -> 1
+                                        "bookmarks" -> 2
+                                        else -> 0
+                                    }
+                                )
                                 "settings" -> SettingsPage(
                                     settings, city, { value -> city = value; viewModel.saveCity(value) }, locate,
                                     { id -> viewModel.saveCalculationMethod(id) },

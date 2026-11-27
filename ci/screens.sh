@@ -61,17 +61,12 @@ shot 11b-voice-test
 adb shell input keyevent KEYCODE_BACK; sleep 1
 adb shell input keyevent KEYCODE_BACK; sleep 1
 tap_text "حول التطبيق"; sleep 2; shot 12-about
-adb shell input keyevent KEYCODE_BACK; sleep 1
-tap_text "القرآن الكريم"; sleep 7; shot 14-quran-list
-tap_text "ٱلْفَاتِحَةِ"; sleep 6; shot 15-mushaf-fatiha
-adb shell input keyevent KEYCODE_BACK; sleep 2
-tap_text "البَقَرَةِ"; sleep 6; shot 16-mushaf-baqarah
-adb shell input swipe 200 1300 900 1300 400; sleep 3; shot 17-mushaf-next-page
-adb shell input keyevent KEYCODE_BACK; sleep 2
-tap_text "الجزء"; sleep 2; shot 18-quran-juz
-tap_text "المرجعيات"; sleep 2; shot 19-quran-bookmarks
-tap_text "سورة"; sleep 1
-adb shell input keyevent KEYCODE_BACK; sleep 1
+adb shell am start -S -n $PKG/.MainActivity --es open quran; sleep 7; shot 14-quran-list
+adb shell am start -S -n $PKG/.MainActivity --es open quran --es tab juz; sleep 7; shot 15-quran-juz
+adb shell am start -S -n $PKG/.MainActivity --es open quran --es tab bookmarks; sleep 7; shot 16-quran-bookmarks
+adb shell am start -S -n $PKG/.MainActivity --es open mushaf:2; sleep 7; shot 17-mushaf-baqarah
+adb shell input swipe 200 1300 900 1300 400; sleep 3; shot 18-mushaf-next-page
+adb shell am start -S -n $PKG/.MainActivity --es open mushaf:1; sleep 7; shot 19-mushaf-fatiha
 adb shell cmd uimode night no || true
 sleep 3
 adb shell input keyevent KEYCODE_BACK; sleep 1

@@ -251,12 +251,12 @@ private fun writeBookmarks(prefs: SharedPreferences, pages: Set<Int>) {
 /* ============================ section ============================ */
 
 @Composable
-internal fun QuranSection(open: (Int) -> Unit, back: () -> Unit) {
+internal fun QuranSection(open: (Int) -> Unit, back: () -> Unit, initialTab: Int = 0) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("quran", Context.MODE_PRIVATE) }
     var data by remember { mutableStateOf<QuranData?>(null) }
     var failed by remember { mutableStateOf(false) }
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by remember { mutableIntStateOf(initialTab) }
     var searchOpen by remember { mutableStateOf(false) }
     var sourcesOpen by remember { mutableStateOf(false) }
     var bookmarks by remember { mutableStateOf(readBookmarks(prefs)) }
