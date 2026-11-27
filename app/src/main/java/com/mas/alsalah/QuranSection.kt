@@ -474,10 +474,10 @@ private fun MushafDownloadCard(
         modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0x14FFFFFF)).padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("تنزيل المصحف", color = QuranGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text("تنزيل المصحف", color = Color(0xFFFBF3DC), fontSize = 17.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(6.dp))
         Text(
-            "صفحات المصحف (٦٠٤ صفحة، نحو ٥٠ ميجابايت) تنزل مرة واحدة، وبعدها يفتح المصحف بدون إنترنت. يعمل على الواي فاي أو بيانات الجوال.",
+            "صفحات المصحف (٦٠٤ صفحة، نحو ٩٥ ميجابايت) تنزل مرة واحدة، وبعدها يفتح المصحف بدون إنترنت. يعمل على الواي فاي أو بيانات الجوال.",
             color = QuranInk.copy(alpha = 0.7f), fontSize = 12.sp, textAlign = TextAlign.Center
         )
         if (state.downloading) {
@@ -490,7 +490,7 @@ private fun MushafDownloadCard(
                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
             )
             Spacer(Modifier.height(6.dp))
-            Text(megabytes(done) + " من " + megabytes(total) + " م.ب", color = QuranInk.copy(alpha = 0.6f), fontSize = 11.sp)
+            Text(megabytes(done) + " من " + megabytes(total) + " م.ب", color = Color(0xFFFBF3DC).copy(alpha = 0.9f), fontSize = 12.sp)
         } else {
             state.error?.let {
                 Spacer(Modifier.height(8.dp))
