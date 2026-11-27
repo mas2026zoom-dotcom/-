@@ -6,6 +6,19 @@ set -x
 ls -la apk || true
 PKG=com.mas.alsalah
 adb wait-for-device
+adb root > /dev/null 2>&1 || true
+sleep 3
+adb wait-for-device
+adb shell "setprop persist.sys.locale ar-EG" || true
+adb shell "setprop persist.sys.language ar" || true
+adb shell "setprop persist.sys.country EG" || true
+adb shell stop || true
+sleep 2
+adb shell start || true
+sleep 45
+adb wait-for-device
+adb shell getprop persist.sys.locale
+adb shell getprop persist.sys.language
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard || true
 adb install -r apk/app-debug.apk || exit 1
@@ -65,11 +78,19 @@ adb shell settings put global hide_error_dialogs 1 || true
 adb shell am start -S -n $PKG/.MainActivity --es open quran; sleep 8; shot 14-quran-list
 adb shell am start -S -n $PKG/.MainActivity --es open quran --es tab juz; sleep 8; shot 15-quran-juz
 adb shell am start -S -n $PKG/.MainActivity --es open quran --es tab bookmarks; sleep 8; shot 16-quran-bookmarks
-page_label() { adb shell uiautomator dump /sdcard/u.xml >/dev/null 2>&1; adb pull /sdcard/u.xml /tmp/u.xml >/dev/null 2>&1; grep -o 'صفحة [^"]*' /tmp/u.xml | head -1; }
+adb shell am start -S -n $PKG/.MainActivity --es open quran --es download 1; sleep 6; shot 25-quran-download-progress
+ready=0
+for try in 1 2 3 4 5 6 7 8 9 10; do
+  sleep 20
+  adb shell am start -S -n $PKG/.MainActivity --es open mushaf:1 > /dev/null 2>&1
+  sleep 6
+  adb shell uiautomator dump /sdcard/u.xml > /dev/null 2>&1
+  adb pull /sdcard/u.xml /tmp/u.xml > /dev/null 2>&1
+  if grep -q 'تنزيل المصحف' /tmp/u.xml; then echo "download still pending $try"; else ready=1; echo "download ready after $try"; break; fi
+done
+shot 26-mushaf-after-download
 adb shell am start -S -n $PKG/.MainActivity --es open mushaf:2; sleep 8; shot 17-mushaf-baqarah; page_label
 adb shell input swipe 1000 1200 60 1200 100; sleep 3; shot 18-swipe-right-to-left; page_label
-adb shell input swipe 60 1200 1000 1200 100; sleep 3; shot 19-swipe-left-to-right; page_label
-adb shell input swipe 60 1200 1000 1200 100; sleep 3; shot 20-swipe-left-to-right-2; page_label
 adb shell am start -S -n $PKG/.MainActivity --es open mushaf:305; sleep 9; shot 22-mushaf-maryam-305; page_label
 adb shell am start -S -n $PKG/.MainActivity --es open mushaf:604; sleep 9; shot 23-mushaf-604; page_label
 adb shell am start -S -n $PKG/.MainActivity --es open mushaf:100; sleep 9; shot 24-mushaf-100; page_label
@@ -81,7 +102,7 @@ for pg in 1 22 42 62 82 102 121 142 162 182 202 222 242 262 282 305 322 342 362 
   sleep 6
   adb shell uiautomator dump /sdcard/u.xml > /dev/null 2>&1
   adb pull /sdcard/u.xml /tmp/u.xml > /dev/null 2>&1
-  if grep -q 'تعذر تحميل' /tmp/u.xml; then echo "PAGE FAIL $pg" >> shots/pages.log; else echo "PAGE OK $pg" >> shots/pages.log; fi
+  if grep -q 'تعذر تحميل\|تنزيل المصحف' /tmp/u.xml; then echo "PAGE FAIL $pg" >> shots/pages.log; else echo "PAGE OK $pg" >> shots/pages.log; fi
 done
 grep -c 'PAGE OK' shots/pages.log || true
 grep 'PAGE FAIL' shots/pages.log || true
