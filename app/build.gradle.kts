@@ -1,6 +1,7 @@
 import java.util.Base64
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.awt.Color
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
@@ -206,7 +207,7 @@ val fetchQuranAssets by tasks.registering {
         // Normalise every page to an 8-bit RGB PNG composited on the reader's paper colour.
         // The upstream files are 4-bit palette PNGs with a tRNS chunk, which some Android
         // decoders refuse; an 8-bit opaque image decodes everywhere and halves bitmap memory.
-        val paper = java.awt.Color(0xF6, 0xEF, 0xDC)
+        val paper = Color(0xF6, 0xEF, 0xDC)
         val pageFiles = pagesDir.listFiles { f -> f.name.endsWith(".png") }?.sortedBy { it.name } ?: emptyList()
         check(pageFiles.size == 604) { "Quran page images incomplete: ${pageFiles.size} of 604" }
         var normalised = 0
