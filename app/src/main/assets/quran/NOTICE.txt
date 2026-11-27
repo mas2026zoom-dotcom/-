@@ -1,0 +1,27 @@
+AL-SALAH - Quran section: sources and licenses
+==============================================
+
+1) Quran page images (604 pages, Madinah Mushaf, 15 lines)
+   Source: https://github.com/tarekeldeeb/madina_images (branch w1024, 1024x1656 PNG)
+   Derived from: https://github.com/quran/quran.com-images
+   The page artwork and the fonts it was generated with belong to the King Fahd
+   Complex for the Printing of the Holy Quran (مجمع الملك فهد لطباعة المصحف الشريف),
+   Madinah. The madina_images repository carries a GPLv3 LICENSE file; the
+   upstream quran.com-images README states that its code is copyleft GPL while the
+   fonts and pages belong to the King Fahd Complex.
+   Bundled unmodified; only the asset file names changed (w1024_pageNNN.png ->
+   pNNN.png).
+
+2) Quran text (Uthmani script, used for the offline verse search)
+   Source: Tanzil Quran Text v1.1, https://tanzil.net/download/
+   Terms of use: "Permission is granted to copy and distribute verbatim copies of
+   the Quran text provided here, but changing the text is not allowed. The text can
+   be used in any website or application, provided that its source (Tanzil Project)
+   is clearly indicated, and a link is made to tanzil.net."
+   Bundled verbatim, unmodified.
+
+3) Surah, juz and page metadata (names, verse counts, revelation place, start pages)
+   Derived from the AlQuran Cloud meta API: https://api.alquran.cloud/v1/meta
+   Page numbering matches the 604-page Madinah Mushaf.
+
+All of the above is stored inside the APK; the Quran section works fully offline.

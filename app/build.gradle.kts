@@ -6,6 +6,7 @@ import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
 import java.net.URL
 import java.security.MessageDigest
+import java.util.zip.ZipInputStream
 
 plugins {
     id("com.android.application")
@@ -21,8 +22,8 @@ android {
         applicationId = "com.mas.alsalah"
         minSdk = 26
         targetSdk = 35
-        versionCode = 11
-        versionName = "3.0.0"
+        versionCode = 12
+        versionName = "3.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -78,6 +79,7 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:core:1.6.1")
+    implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -163,6 +165,58 @@ val downloadVerifiedAdhan by tasks.registering {
     }
 }
 
+// Bundle the fully offline Quran section: Madinah Mushaf page images (604 pages)
+// and the Tanzil Uthmani text used for offline search. Both are fetched once at
+// build time and baked into the APK assets, so the app never needs the network.
+val fetchQuranAssets by tasks.registering {
+    val assetsDir = layout.projectDirectory.dir("src/main/assets/quran").asFile
+    outputs.dir(assetsDir)
+    doLast {
+        assetsDir.mkdirs()
+        val pagesDir = File(assetsDir, "pages")
+        pagesDir.mkdirs()
+        val havePages = pagesDir.listFiles { f -> f.name.endsWith(".png") }?.size ?: 0
+        if (havePages < 604) {
+            val archive = File(temporaryDir, "madina.zip")
+            val source = "https://codeload.github.com/tarekeldeeb/madina_images/zip/refs/heads/w1024"
+            val connection = URL(source).openConnection().apply {
+                connectTimeout = 20000
+                readTimeout = 300000
+                setRequestProperty("User-Agent", "AL-SALAH-Android/3.1")
+            }
+            connection.getInputStream().use { input -> archive.outputStream().use { output -> input.copyTo(output) } }
+            ZipInputStream(archive.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val name = entry.name.substringAfterLast('/')
+                    if (!entry.isDirectory && name.startsWith("w1024_page") && name.endsWith(".png")) {
+                        val page = name.removePrefix("w1024_page").removeSuffix(".png").toIntOrNull()
+                        if (page != null && page in 1..604) {
+                            File(pagesDir, "p%03d.png".format(page)).outputStream().use { out -> zip.copyTo(out) }
+                        }
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
+            }
+            archive.delete()
+            val count = pagesDir.listFiles { f -> f.name.endsWith(".png") }?.size ?: 0
+            check(count == 604) { "Quran page images incomplete: $count of 604" }
+        }
+        val textFile = File(assetsDir, "quran_uthmani.txt")
+        if (!textFile.exists() || textFile.length() < 1000000L) {
+            val source = "https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt-2&agree=true"
+            val connection = URL(source).openConnection().apply {
+                connectTimeout = 20000
+                readTimeout = 120000
+                setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; AL-SALAH-Android/3.1)")
+            }
+            connection.getInputStream().use { input -> textFile.outputStream().use { output -> input.copyTo(output) } }
+            check(textFile.length() > 1000000L) { "Tanzil Quran text download failed" }
+        }
+    }
+}
+
 tasks.named("preBuild").configure {
-    dependsOn(generateAlSalahLauncherIcons, downloadVerifiedAdhan)
+    dependsOn(generateAlSalahLauncherIcons, downloadVerifiedAdhan, fetchQuranAssets)
 }

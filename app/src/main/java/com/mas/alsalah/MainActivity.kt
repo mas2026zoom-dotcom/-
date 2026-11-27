@@ -347,13 +347,14 @@ private val duas = listOf(
                         label = "screen-transition"
                     ) { destination ->
                         if (destination.startsWith("page:")) {
-                            when (destination.removePrefix("page:")) {
+                            when (val dest = destination.removePrefix("page:")) {
                                 "tasbeeh" -> TasbeehPage(settings.tasbeehCount, settings.tasbeehTarget, viewModel::saveTasbeeh, goBack)
                                 "prayer" -> PrayerPage(prayerTimes, locate, settings.use24Hour, settings.showSunrise, latitude, longitude, method, zone, settings.hijriDayOffset)
                                 "favorites" -> FavoritesPage(goBack)
                                 "about" -> AboutPage(goBack)
                                 "calendar" -> CalendarPage(goBack, settings.hijriDayOffset)
                                 "duas" -> DuasPage(goBack)
+                                "quran" -> QuranSection(open = { openPage("mushaf:$it") }, back = goBack)
                                 "settings" -> SettingsPage(
                                     settings, city, { value -> city = value; viewModel.saveCity(value) }, locate,
                                     { id -> viewModel.saveCalculationMethod(id) },
@@ -363,7 +364,9 @@ private val duas = listOf(
                                     viewModel::saveClockFormat, viewModel::saveHijriDayOffset, viewModel::saveShowSunrise,
                                     viewModel::saveThemeMode, goBack
                                 )
-                                else -> MorePage(openPage)
+                                else -> if (dest.startsWith("mushaf:"))
+                                    MushafScreen(startPage = dest.removePrefix("mushaf:").toIntOrNull() ?: 1, back = goBack)
+                                else MorePage(openPage)
                             }
                         } else {
                             when (Tab.valueOf(destination.removePrefix("tab:"))) {
@@ -800,6 +803,7 @@ private fun prayerIcon(name: String) = when (name) {
 
 @Composable private fun MorePage(open: (String) -> Unit) {
     val entries = listOf(
+        Triple("القرآن الكريم", "المصحف الشريف بدون إنترنت", Icons.Outlined.MenuBook) to "quran",
         Triple("التقويم الهجري", "التاريخ والمناسبات", Icons.Outlined.CalendarMonth) to "calendar",
         Triple("مواقيت الصلاة", "جدول الشهر الهجري", Icons.Outlined.AccessTime) to "prayer",
         Triple("الأدعية", "من القرآن والسنة", Icons.Outlined.FavoriteBorder) to "duas",
