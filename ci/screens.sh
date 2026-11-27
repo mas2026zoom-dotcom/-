@@ -65,10 +65,12 @@ adb shell settings put global hide_error_dialogs 1 || true
 adb shell am start -S -n $PKG/.MainActivity --es open quran; sleep 8; shot 14-quran-list
 adb shell am start -S -n $PKG/.MainActivity --es open quran --es tab juz; sleep 8; shot 15-quran-juz
 adb shell am start -S -n $PKG/.MainActivity --es open quran --es tab bookmarks; sleep 8; shot 16-quran-bookmarks
-adb shell am start -S -n $PKG/.MainActivity --es open mushaf:2; sleep 8; shot 17-mushaf-baqarah
-adb shell input swipe 120 900 620 900 500; sleep 2
-adb shell input swipe 120 900 620 900 500; sleep 4; shot 18-mushaf-next-page
-adb shell am start -S -n $PKG/.MainActivity --es open mushaf:1; sleep 8; shot 19-mushaf-fatiha
+page_label() { adb shell uiautomator dump /sdcard/u.xml >/dev/null 2>&1; adb pull /sdcard/u.xml /tmp/u.xml >/dev/null 2>&1; grep -o 'ØµÙØ­Ø© [^"]*' /tmp/u.xml | head -1; }
+adb shell am start -S -n $PKG/.MainActivity --es open mushaf:2; sleep 8; shot 17-mushaf-baqarah; page_label
+adb shell input swipe 1000 1200 60 1200 100; sleep 3; shot 18-swipe-right-to-left; page_label
+adb shell input swipe 60 1200 1000 1200 100; sleep 3; shot 19-swipe-left-to-right; page_label
+adb shell input swipe 60 1200 1000 1200 100; sleep 3; shot 20-swipe-left-to-right-2; page_label
+adb shell am start -S -n $PKG/.MainActivity --es open mushaf:1; sleep 8; shot 21-mushaf-fatiha
 adb shell cmd uimode night no || true
 sleep 3
 adb shell input keyevent KEYCODE_BACK; sleep 1
