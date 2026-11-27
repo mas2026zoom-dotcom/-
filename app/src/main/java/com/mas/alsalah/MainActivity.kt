@@ -361,7 +361,8 @@ private val duas = listOf(
                                         "juz" -> 1
                                         "bookmarks" -> 2
                                         else -> 0
-                                    }
+                                    },
+                                    autodownload = (context as? android.app.Activity)?.intent?.getStringExtra("download") == "1"
                                 )
                                 "settings" -> SettingsPage(
                                     settings, city, { value -> city = value; viewModel.saveCity(value) }, locate,
@@ -373,7 +374,11 @@ private val duas = listOf(
                                     viewModel::saveThemeMode, goBack
                                 )
                                 else -> if (dest.startsWith("mushaf:"))
-                                    MushafScreen(startPage = dest.removePrefix("mushaf:").toIntOrNull() ?: 1, back = goBack)
+                                    MushafScreen(
+                                        startPage = dest.removePrefix("mushaf:").toIntOrNull() ?: 1,
+                                        back = goBack,
+                                        autodownload = (context as? android.app.Activity)?.intent?.getStringExtra("download") == "1"
+                                    )
                                 else MorePage(openPage)
                             }
                         } else {

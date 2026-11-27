@@ -1,6 +1,12 @@
 package com.mas.alsalah
 
 import android.content.Context
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.zip.ZipInputStream
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -36,7 +42,9 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -65,6 +73,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import androidx.compose.ui.unit.sp
@@ -232,6 +242,93 @@ private val QuranGreen = Color(0xFF0B6B4A)
 
 internal data class PageLoad(val bitmap: ImageBitmap?, val error: String?)
 
+private object QuranStore {
+    private const val ZIP_URL = "https://github.com/mas2026zoom-dotcom/-/releases/download/quran-pages/quran-pages.zip"
+    const val PAGES = 604
+
+    fun dir(context: Context): File = File(context.filesDir, "quran")
+    fun pagesDir(context: Context): File = File(dir(context), "pages")
+    fun pageFile(context: Context, page: Int): File = File(pagesDir(context), "p" + page.toString().padStart(3, '0') + ".png")
+
+    fun ready(context: Context): Boolean {
+        if (!File(dir(context), "ready").exists()) return false
+        val files = pagesDir(context).listFiles { f -> f.name.endsWith(".png") } ?: return false
+        return files.size >= PAGES
+    }
+
+    fun storedBytes(context: Context): Long {
+        val files = pagesDir(context).listFiles() ?: return 0L
+        return files.sumOf { it.length() }
+    }
+
+    suspend fun download(context: Context, onProgress: (Long, Long) -> Unit): Result<Int> = withContext(Dispatchers.IO) {
+        runCatching {
+            val root = dir(context)
+            root.mkdirs()
+            val zip = File(root, "madina.zip")
+            val have = if (zip.exists()) zip.length() else 0L
+            val connection = (URL(ZIP_URL).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 20000
+                readTimeout = 60000
+                instanceFollowRedirects = true
+                setRequestProperty("User-Agent", "AL-SALAH-Android/3.2")
+                if (have > 0) setRequestProperty("Range", "bytes=" + have + "-")
+            }
+            connection.connect()
+            val code = connection.responseCode
+            if (code !in 200..299) throw IOException("HTTP " + code)
+            val append = code == 206 && have > 0
+            val total = if (append) have + connection.contentLengthLong else connection.contentLengthLong
+            var done = if (append) have else 0L
+            var lastReport = 0L
+            connection.inputStream.use { input ->
+                FileOutputStream(zip, append).use { output ->
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        done += read
+                        if (done - lastReport > 512 * 1024) {
+                            lastReport = done
+                            onProgress(done, total)
+                        }
+                    }
+                }
+            }
+            onProgress(done, total)
+            if (total > 0 && zip.length() < total && !append) throw IOException("تنزيل غير مكتمل")
+            val pages = pagesDir(context)
+            pages.mkdirs()
+            var count = 0
+            ZipInputStream(zip.inputStream().buffered()).use { zipped ->
+                var entry = zipped.nextEntry
+                while (entry != null) {
+                    val name = entry.name.substringAfterLast('/')
+                    if (!entry.isDirectory && name.startsWith("w1024_page") && name.endsWith(".png")) {
+                        val number = name.removePrefix("w1024_page").removeSuffix(".png").toIntOrNull()
+                        if (number != null && number in 1..PAGES) {
+                            val target = File(pages, "p" + number.toString().padStart(3, '0') + ".png")
+                            target.outputStream().use { out -> zipped.copyTo(out) }
+                            val head = ByteArray(8)
+                            target.inputStream().use { it.read(head) }
+                            val png = head[0] == 0x89.toByte() && head[1] == 'P'.code.toByte() && head[2] == 'N'.code.toByte()
+                            if (!png || target.length() < 2000L) throw IOException("صفحة تالفة " + number)
+                            count++
+                        }
+                    }
+                    zipped.closeEntry()
+                    entry = zipped.nextEntry
+                }
+            }
+            if (count < PAGES) throw IOException("نزلت " + count + " من " + PAGES + " صفحة")
+            zip.delete()
+            File(root, "ready").writeText(count.toString())
+            count
+        }
+    }
+}
+
 private object QuranPages {
     private val cache = object : LruCache<String, ImageBitmap>(cacheBytes()) {
         override fun sizeOf(key: String, value: ImageBitmap): Int = value.width * value.height * 2
@@ -264,13 +361,37 @@ private object QuranPages {
     }
 
     private fun decode(context: Context, page: Int): PageLoad {
-        val name = "quran/pages/p%03d.png".format(page)
+        val file = QuranStore.pageFile(context, page)
+        if (file.exists()) {
+            val fromFile = decodeFile(file, 1)
+            if (fromFile.bitmap != null) return fromFile
+            cache.evictAll()
+            val smaller = decodeFile(file, 2)
+            if (smaller.bitmap != null) return smaller
+            return smaller
+        }
+        val name = "quran/pages/p" + page.toString().padStart(3, '0') + ".png"
         val first = decodeWith(context, name, 1)
         if (first.bitmap != null) return first
         cache.evictAll()
         val second = decodeWith(context, name, 2)
         if (second.bitmap != null) return second
         return PageLoad(null, (first.error ?: "خطأ") + " | " + (second.error ?: "خطأ"))
+    }
+
+    private fun decodeFile(file: File, sample: Int): PageLoad {
+        return try {
+            val options = BitmapFactory.Options().apply {
+                inPreferredConfig = Bitmap.Config.RGB_565
+                inSampleSize = sample
+                inScaled = false
+            }
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath, options)
+            if (bitmap == null) PageLoad(null, "decodeFile=null (sample " + sample + ")") else PageLoad(bitmap.asImageBitmap(), null)
+        } catch (t: Throwable) {
+            Log.w("QuranPages", "decode failed for " + file.name + " sample=" + sample, t)
+            PageLoad(null, t.javaClass.simpleName + ": " + (t.message ?: ""))
+        }
     }
 
     private fun decodeWith(context: Context, name: String, sample: Int): PageLoad {
@@ -308,10 +429,89 @@ private fun writeBookmarks(prefs: SharedPreferences, pages: Set<Int>) {
     prefs.edit().putStringSet("bookmarks", pages.map { it.toString() }.toSet()).apply()
 }
 
+
+private class MushafDownloadState(initialReady: Boolean) {
+    var ready by mutableStateOf(initialReady)
+    var downloading by mutableStateOf(false)
+    var progress by mutableStateOf<Pair<Long, Long>?>(null)
+    var error by mutableStateOf<String?>(null)
+    var dismissed by mutableStateOf(false)
+
+    fun start(context: Context, scope: CoroutineScope) {
+        if (downloading) return
+        downloading = true
+        error = null
+        progress = 0L to 0L
+        scope.launch {
+            val result = QuranStore.download(context) { done, total -> progress = done to total }
+            downloading = false
+            if (result.isSuccess) {
+                ready = true
+                progress = null
+            } else {
+                error = result.exceptionOrNull()?.let { it.javaClass.simpleName + ": " + (it.message ?: "") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun rememberMushafDownload(context: Context): MushafDownloadState =
+    remember { MushafDownloadState(QuranStore.ready(context)) }
+
+private fun megabytes(bytes: Long): String =
+    String.format(java.util.Locale.US, "%.1f", bytes / (1024.0 * 1024.0))
+
+@Composable
+private fun MushafDownloadCard(
+    state: MushafDownloadState,
+    onDownload: () -> Unit,
+    onDismiss: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0x14FFFFFF)).padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("تنزيل المصحف", color = QuranGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "صفحات المصحف (٦٠٤ صفحة، نحو ٥٠ ميجابايت) تنزل مرة واحدة، وبعدها يفتح المصحف بدون إنترنت. يعمل على الواي فاي أو بيانات الجوال.",
+            color = QuranInk.copy(alpha = 0.7f), fontSize = 12.sp, textAlign = TextAlign.Center
+        )
+        if (state.downloading) {
+            val done = state.progress?.first ?: 0L
+            val total = state.progress?.second ?: 0L
+            val fraction = if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else 0f
+            Spacer(Modifier.height(12.dp))
+            LinearProgressIndicator(
+                progress = { fraction },
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(megabytes(done) + " من " + megabytes(total) + " م.ب", color = QuranInk.copy(alpha = 0.6f), fontSize = 11.sp)
+        } else {
+            state.error?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, color = Color(0xFFB3261E), fontSize = 10.sp, textAlign = TextAlign.Center)
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = onDownload) {
+                    Text(if (state.error == null) "تنزيل المصحف" else "إعادة المحاولة", fontSize = 14.sp)
+                }
+                if (onDismiss != null) {
+                    TextButton(onClick = onDismiss) { Text("لاحقًا", color = QuranInk.copy(alpha = 0.7f), fontSize = 14.sp) }
+                }
+            }
+        }
+    }
+}
+
 /* ============================ section ============================ */
 
 @Composable
-internal fun QuranSection(open: (Int) -> Unit, back: () -> Unit, initialTab: Int = 0) {
+internal fun QuranSection(open: (Int) -> Unit, back: () -> Unit, initialTab: Int = 0, autodownload: Boolean = false) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("quran", Context.MODE_PRIVATE) }
     var data by remember { mutableStateOf<QuranData?>(null) }
@@ -320,10 +520,15 @@ internal fun QuranSection(open: (Int) -> Unit, back: () -> Unit, initialTab: Int
     var searchOpen by remember { mutableStateOf(false) }
     var sourcesOpen by remember { mutableStateOf(false) }
     var bookmarks by remember { mutableStateOf(readBookmarks(prefs)) }
+    val download = rememberMushafDownload(context)
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         val loaded = withContext(Dispatchers.IO) { runCatching { QuranRepo.data(context) }.getOrNull() }
         if (loaded == null) failed = true else data = loaded
+    }
+    LaunchedEffect(autodownload) {
+        if (autodownload && !download.ready) download.start(context, scope)
     }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp)) {
@@ -339,6 +544,15 @@ internal fun QuranSection(open: (Int) -> Unit, back: () -> Unit, initialTab: Int
                 Text("قرآن", color = MaterialTheme.colorScheme.onSurface, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.End)
                 Box(Modifier.width(36.dp).height(3.dp).clip(RoundedCornerShape(2.dp)).background(Lux.goldBrush))
             }
+        }
+
+        if (!download.ready && !download.dismissed) {
+            MushafDownloadCard(
+                state = download,
+                onDownload = { download.start(context, scope) },
+                onDismiss = { download.dismissed = true }
+            )
+            Spacer(Modifier.height(12.dp))
         }
 
         Spacer(Modifier.height(10.dp))
@@ -650,14 +864,19 @@ private fun QuranSources(onClose: () -> Unit) {
 /* ============================ mushaf ============================ */
 
 @Composable
-internal fun MushafScreen(startPage: Int, back: () -> Unit) {
+internal fun MushafScreen(startPage: Int, back: () -> Unit, autodownload: Boolean = false) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("quran", Context.MODE_PRIVATE) }
     var data by remember { mutableStateOf<QuranData?>(null) }
     var bookmarks by remember { mutableStateOf(readBookmarks(prefs)) }
+    val download = rememberMushafDownload(context)
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         data = withContext(Dispatchers.IO) { runCatching { QuranRepo.data(context) }.getOrNull() }
+    }
+    LaunchedEffect(autodownload) {
+        if (autodownload && !download.ready) download.start(context, scope)
     }
 
     val pager = rememberPagerState(initialPage = (startPage - 1).coerceIn(0, 603), pageCount = { 604 })
@@ -704,13 +923,23 @@ internal fun MushafScreen(startPage: Int, back: () -> Unit) {
             }
         }
 
-        HorizontalPager(
-            state = pager,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            reverseLayout = true,
-            beyondViewportPageCount = 0
-        ) { index ->
-            MushafPageImage(index + 1)
+        if (!download.ready) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                MushafDownloadCard(
+                    state = download,
+                    onDownload = { download.start(context, scope) },
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+            }
+        } else {
+            HorizontalPager(
+                state = pager,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                reverseLayout = true,
+                beyondViewportPageCount = 0
+            ) { index ->
+                MushafPageImage(index + 1)
+            }
         }
     }
 }
