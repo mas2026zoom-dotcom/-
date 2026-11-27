@@ -230,48 +230,68 @@ private val QuranPaper = Color(0xFFF6EFDC)
 private val QuranInk = Color(0xFF14251D)
 private val QuranGreen = Color(0xFF0B6B4A)
 
+internal data class PageLoad(val bitmap: ImageBitmap?, val error: String?)
+
 private object QuranPages {
     private val cache = object : LruCache<String, ImageBitmap>(cacheBytes()) {
-        override fun sizeOf(key: String, value: ImageBitmap): Int = value.width * value.height * 4
+        override fun sizeOf(key: String, value: ImageBitmap): Int = value.width * value.height * 2
     }
     private val gate = Semaphore(1)
 
     private fun cacheBytes(): Int {
-        val budget = (Runtime.getRuntime().maxMemory() / 6).toInt()
-        return budget.coerceIn(24 * 1024 * 1024, 96 * 1024 * 1024)
+        val budget = (Runtime.getRuntime().maxMemory() / 8).toInt()
+        return budget.coerceIn(16 * 1024 * 1024, 64 * 1024 * 1024)
     }
 
     fun cached(page: Int): ImageBitmap? = cache.get("p" + page)
 
-    suspend fun load(context: Context, page: Int): ImageBitmap? = withContext(Dispatchers.IO) {
+    suspend fun load(context: Context, page: Int): PageLoad = withContext(Dispatchers.IO) {
         val key = "p" + page
         val hit = cache.get(key)
-        if (hit != null) return@withContext hit
-        var decoded: ImageBitmap? = null
+        if (hit != null) return@withContext PageLoad(hit, null)
+        var result = PageLoad(null, "لم تبدأ القراءة")
         gate.withPermit {
             val again = cache.get(key)
             if (again != null) {
-                decoded = again
+                result = PageLoad(again, null)
             } else {
-                val fresh = decode(context, page)
-                if (fresh != null) cache.put(key, fresh)
-                decoded = fresh
+                val attempt = decode(context, page)
+                if (attempt.bitmap != null) cache.put(key, attempt.bitmap)
+                result = attempt
             }
         }
-        decoded
+        result
     }
 
-    private fun decode(context: Context, page: Int): ImageBitmap? = try {
-        context.assets.open("quran/pages/p%03d.png".format(page)).use { stream ->
-            val options = BitmapFactory.Options().apply {
-                inPreferredConfig = Bitmap.Config.ARGB_8888
-                inScaled = false
+    private fun decode(context: Context, page: Int): PageLoad {
+        val name = "quran/pages/p%03d.png".format(page)
+        val first = decodeWith(context, name, 1)
+        if (first.bitmap != null) return first
+        cache.evictAll()
+        val second = decodeWith(context, name, 2)
+        if (second.bitmap != null) return second
+        return PageLoad(null, (first.error ?: "خطأ") + " | " + (second.error ?: "خطأ"))
+    }
+
+    private fun decodeWith(context: Context, name: String, sample: Int): PageLoad {
+        return try {
+            context.assets.open(name).use { stream ->
+                val options = BitmapFactory.Options().apply {
+                    inPreferredConfig = Bitmap.Config.RGB_565
+                    inSampleSize = sample
+                    inScaled = false
+                }
+                val bitmap = BitmapFactory.decodeStream(stream, null, options)
+                if (bitmap == null) {
+                    PageLoad(null, "decodeStream=null (sample $sample)")
+                } else {
+                    PageLoad(bitmap.asImageBitmap(), null)
+                }
             }
-            BitmapFactory.decodeStream(stream, null, options)?.asImageBitmap()
+        } catch (t: Throwable) {
+            Log.w("QuranPages", "decode failed for " + name + " sample=" + sample, t)
+            PageLoad(null, t.javaClass.simpleName + ": " + (t.message ?: ""))
         }
-    } catch (t: Throwable) {
-        Log.w("QuranPages", "decode failed for page " + page, t)
-        null
     }
 
     suspend fun prefetch(context: Context, page: Int) {
@@ -699,20 +719,15 @@ internal fun MushafScreen(startPage: Int, back: () -> Unit) {
 private fun MushafPageImage(page: Int) {
     val context = LocalContext.current
     var attempt by remember(page) { mutableIntStateOf(0) }
-    var failed by remember(page, attempt) { mutableStateOf(false) }
-    val bitmap by produceState<ImageBitmap?>(initialValue = QuranPages.cached(page), key1 = page, key2 = attempt) {
-        if (value == null) {
-            val loaded = QuranPages.load(context, page)
-            value = loaded
-            failed = loaded == null
-        }
-        if (value != null) {
+    val state by produceState<PageLoad?>(initialValue = QuranPages.cached(page)?.let { PageLoad(it, null) }, key1 = page, key2 = attempt) {
+        if (value == null) value = QuranPages.load(context, page)
+        if (value?.bitmap != null) {
             QuranPages.prefetch(context, page + 1)
             QuranPages.prefetch(context, page - 1)
         }
     }
     Box(Modifier.fillMaxSize().background(QuranPaper), contentAlignment = Alignment.Center) {
-        val image = bitmap
+        val image = state?.bitmap
         when {
             image != null -> Image(
                 bitmap = image,
@@ -720,8 +735,13 @@ private fun MushafPageImage(page: Int) {
                 modifier = Modifier.fillMaxWidth(),
                 contentScale = ContentScale.FillWidth
             )
-            failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("تعذر تحميل الصفحة", color = QuranInk.copy(alpha = 0.7f), fontSize = 14.sp)
+            state != null -> Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(24.dp)
+            ) {
+                Text("تعذر تحميل الصفحة", color = QuranInk.copy(alpha = 0.75f), fontSize = 14.sp)
+                Spacer(Modifier.height(4.dp))
+                Text(state?.error ?: "", color = QuranInk.copy(alpha = 0.55f), fontSize = 10.sp)
                 Spacer(Modifier.height(6.dp))
                 TextButton(onClick = { attempt += 1 }) {
                     Text("إعادة المحاولة", color = QuranGreen, fontSize = 14.sp)

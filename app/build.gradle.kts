@@ -203,6 +203,33 @@ val fetchQuranAssets by tasks.registering {
             val count = pagesDir.listFiles { f -> f.name.endsWith(".png") }?.size ?: 0
             check(count == 604) { "Quran page images incomplete: $count of 604" }
         }
+        // Normalise every page to an 8-bit RGB PNG composited on the reader's paper colour.
+        // The upstream files are 4-bit palette PNGs with a tRNS chunk, which some Android
+        // decoders refuse; an 8-bit opaque image decodes everywhere and halves bitmap memory.
+        val paper = java.awt.Color(0xF6, 0xEF, 0xDC)
+        val pageFiles = pagesDir.listFiles { f -> f.name.endsWith(".png") }?.sortedBy { it.name } ?: emptyList()
+        check(pageFiles.size == 604) { "Quran page images incomplete: ${pageFiles.size} of 604" }
+        var normalised = 0
+        pageFiles.forEach { file ->
+            val source = ImageIO.read(file) ?: error("Unreadable Quran page: ${file.name}")
+            if (source.width != 1024 || source.height != 1656) {
+                error("Unexpected Quran page size ${source.width}x${source.height} in ${file.name}")
+            }
+            val flat = BufferedImage(source.width, source.height, BufferedImage.TYPE_INT_RGB)
+            val g = flat.createGraphics()
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+            g.color = paper
+            g.fillRect(0, 0, flat.width, flat.height)
+            g.drawImage(source, 0, 0, null)
+            g.dispose()
+            ImageIO.write(flat, "png", file)
+            val check = ImageIO.read(file) ?: error("Normalised Quran page unreadable: ${file.name}")
+            if (check.type != BufferedImage.TYPE_3BYTE_BGR && check.type != BufferedImage.TYPE_INT_RGB) {
+                error("Normalised Quran page still not 8-bit RGB: ${file.name} type=${check.type}")
+            }
+            normalised++
+        }
+        check(normalised == 604) { "Normalised $normalised of 604 Quran pages" }
         val textFile = File(assetsDir, "quran_uthmani.txt")
         if (!textFile.exists() || textFile.length() < 1000000L) {
             val source = "https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt-2&agree=true"
