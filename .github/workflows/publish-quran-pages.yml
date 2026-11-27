@@ -15,17 +15,43 @@ jobs:
         run: |
           set -e
           curl -sSL --retry 3 -o upstream.zip https://codeload.github.com/tarekeldeeb/madina_images/zip/refs/heads/w1024
-          unzip -q upstream.zip -d up
+          ls -l upstream.zip
+          python3 -c "import zipfile; zipfile.ZipFile('upstream.zip').extractall('up')"
           find up -name 'w1024_page*.png' | wc -l
       - name: Normalise to 8-bit RGB PNG
         run: |
           set -e
           mkdir -p pages
-          for f in $(find up -name 'w1024_page*.png' | sort); do
-            b=$(basename "$f"); num=${b#w1024_page}; num=${num%.png}
-            out=$(printf '%03d' $((10#$num)))
-            convert "$f" -background white -alpha remove -alpha off -depth 8 -type TrueColor -strip "pages/p$out.png"
-          done
+          if command -v magick >/dev/null 2>&1; then
+            echo "using magick"
+            for f in $(find up -name 'w1024_page*.png' | sort); do
+              b=$(basename "$f"); num=${b#w1024_page}; num=${num%.png}
+              out=$(printf '%03d' $((10#$num)))
+              magick "$f" -background white -alpha remove -alpha off -depth 8 -type TrueColor -strip "pages/p$out.png"
+            done
+          elif command -v convert >/dev/null 2>&1; then
+            echo "using convert"
+            for f in $(find up -name 'w1024_page*.png' | sort); do
+              b=$(basename "$f"); num=${b#w1024_page}; num=${num%.png}
+              out=$(printf '%03d' $((10#$num)))
+              convert "$f" -background white -alpha remove -alpha off -depth 8 -type TrueColor -strip "pages/p$out.png"
+            done
+          else
+            echo "no imagemagick, using pillow"
+            python3 -m pip install --quiet pillow || true
+            python3 - <<'PY'
+          import glob, os
+          from PIL import Image
+          fs = sorted(glob.glob('up/**/w1024_page*.png', recursive=True))
+          for f in fs:
+              n = int(os.path.basename(f).split('_')[-1].split('.')[0])
+              im = Image.open(f).convert('RGBA')
+              bg = Image.new('RGB', im.size, (255, 255, 255))
+              bg.paste(im, mask=im.split()[-1])
+              bg.save('pages/p%03d.png' % n)
+          print('converted', len(fs))
+          PY
+          fi
           ls pages | wc -l
           du -sh pages
       - name: Verify pages
@@ -47,7 +73,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          zip -q -r -9 quran-pages.zip pages
+          python3 -c "import shutil; shutil.make_archive('quran-pages','zip','.','pages')"
           ls -l quran-pages.zip
           gh release view quran-pages >/dev/null 2>&1 || gh release create quran-pages --title "Quran pages (Madinah mushaf)" --notes "604 page images, 1024x1656, 8-bit RGB PNG. Normalised from github.com/tarekeldeeb/madina_images (GPLv3), which derives from github.com/quran/quran.com-images; artwork belongs to King Fahd Complex."
           gh release upload quran-pages quran-pages.zip --clobber
