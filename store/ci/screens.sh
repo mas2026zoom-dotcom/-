@@ -18,7 +18,7 @@ sleep 45
 adb wait-for-device
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard || true
-adb install -r apk/app-debug.apk || exit 1
+adb install -r apk/*.apk || exit 1
 adb shell settings put global hide_error_dialogs 1 || true
 adb shell cmd uimode night yes || true
 shot() { adb exec-out screencap -p > "shots/$1.png"; }
