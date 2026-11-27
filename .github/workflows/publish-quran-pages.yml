@@ -1,0 +1,54 @@
+name: publish-quran-pages
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-quran-pages.yml'
+      - 'ci/publish-pages.txt'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch upstream Madinah pages
+        run: |
+          set -e
+          curl -sSL --retry 3 -o upstream.zip https://codeload.github.com/tarekeldeeb/madina_images/zip/refs/heads/w1024
+          unzip -q upstream.zip -d up
+          find up -name 'w1024_page*.png' | wc -l
+      - name: Normalise to 8-bit RGB PNG
+        run: |
+          set -e
+          mkdir -p pages
+          for f in $(find up -name 'w1024_page*.png' | sort); do
+            b=$(basename "$f"); num=${b#w1024_page}; num=${num%.png}
+            out=$(printf '%03d' $((10#$num)))
+            convert "$f" -background white -alpha remove -alpha off -depth 8 -type TrueColor -strip "pages/p$out.png"
+          done
+          ls pages | wc -l
+          du -sh pages
+      - name: Verify pages
+        run: |
+          python3 - <<'PY'
+          import glob, struct
+          fs = sorted(glob.glob('pages/*.png'))
+          assert len(fs) == 604, len(fs)
+          for f in fs:
+              d = open(f, 'rb').read(40)
+              assert d[:4] == b'\x89PNG', f
+              w, h = struct.unpack('>II', d[16:24])
+              assert (w, h) == (1024, 1656), (f, w, h)
+              assert d[24] == 8 and d[25] == 2, (f, d[24], d[25])
+          print('ok: 604 pages, 1024x1656, 8-bit RGB')
+          PY
+      - name: Zip and publish release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          zip -q -r -9 quran-pages.zip pages
+          ls -l quran-pages.zip
+          gh release view quran-pages >/dev/null 2>&1 || gh release create quran-pages --title "Quran pages (Madinah mushaf)" --notes "604 page images, 1024x1656, 8-bit RGB PNG. Normalised from github.com/tarekeldeeb/madina_images (GPLv3), which derives from github.com/quran/quran.com-images; artwork belongs to King Fahd Complex."
+          gh release upload quran-pages quran-pages.zip --clobber
+          gh release view quran-pages --json assets -q '.assets[] | .name + " " + (.size|tostring)'
