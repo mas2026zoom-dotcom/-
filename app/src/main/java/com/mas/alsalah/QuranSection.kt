@@ -305,8 +305,9 @@ private object QuranStore {
                 var entry = zipped.nextEntry
                 while (entry != null) {
                     val name = entry.name.substringAfterLast('/')
-                    if (!entry.isDirectory && name.startsWith("w1024_page") && name.endsWith(".png")) {
-                        val number = name.removePrefix("w1024_page").removeSuffix(".png").toIntOrNull()
+                    if (!entry.isDirectory && name.endsWith(".png") && !entry.name.startsWith("__MACOSX")) {
+                        // accepts p001.png (our release asset) and w1024_page001.png (upstream archive)
+                        val number = name.removeSuffix(".png").filter { it.isDigit() }.takeLast(3).toIntOrNull()
                         if (number != null && number in 1..PAGES) {
                             val target = File(pages, "p" + number.toString().padStart(3, '0') + ".png")
                             target.outputStream().use { out -> zipped.copyTo(out) }
