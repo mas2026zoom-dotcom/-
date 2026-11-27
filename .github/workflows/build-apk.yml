@@ -97,4 +97,13 @@ jobs:
         run: |
           ls shots || true
           gh release delete screens-latest --yes --cleanup-tag || true
-          gh release create screens-latest shots/* --title "Screens" --notes "screens" --target "$GITHUB_SHA" || true
+          sleep 5
+          gh release create screens-latest --title "Screens" --notes "screens" --target "$GITHUB_SHA" || true
+          for f in shots/*; do
+            for try in 1 2 3; do
+              gh release upload screens-latest "$f" --clobber && break
+              echo "upload retry $try for $f"
+              sleep 5
+            done
+          done
+          gh release view screens-latest --json assets -q '.assets[].name' || true
