@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Apply overlay
         run: |
-          if [ -f patch/go.txt ]; then
+          if [ -f patch/go.txt ] && ls patch/part*.b64 >/dev/null 2>&1; then
             cat patch/part*.b64 | base64 -d > /tmp/overlay.zip
             unzip -o /tmp/overlay.zip -d .
             if [ -f patch/delete.txt ]; then xargs -r rm -f < patch/delete.txt; fi
