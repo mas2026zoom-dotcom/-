@@ -75,6 +75,16 @@ adb shell am start -S -n $PKG/.MainActivity --es open mushaf:604; sleep 9; shot 
 adb shell am start -S -n $PKG/.MainActivity --es open mushaf:100; sleep 9; shot 24-mushaf-100; page_label
 adb shell am start -S -n $PKG/.MainActivity --es open mushaf:1; sleep 8; shot 21-mushaf-fatiha
 adb shell logcat -d | grep -i QuranPages > shots/quran.log 2>&1 || true
+: > shots/pages.log
+for pg in 1 22 42 62 82 102 121 142 162 182 202 222 242 262 282 305 322 342 362 382 402 422 442 462 482 502 522 542 562 582 604; do
+  adb shell am start -S -n $PKG/.MainActivity --es open mushaf:$pg > /dev/null 2>&1
+  sleep 6
+  adb shell uiautomator dump /sdcard/u.xml > /dev/null 2>&1
+  adb pull /sdcard/u.xml /tmp/u.xml > /dev/null 2>&1
+  if grep -q 'تعذر تحميل' /tmp/u.xml; then echo "PAGE FAIL $pg" >> shots/pages.log; else echo "PAGE OK $pg" >> shots/pages.log; fi
+done
+grep -c 'PAGE OK' shots/pages.log || true
+grep 'PAGE FAIL' shots/pages.log || true
 adb shell cmd uimode night no || true
 sleep 3
 adb shell input keyevent KEYCODE_BACK; sleep 1
